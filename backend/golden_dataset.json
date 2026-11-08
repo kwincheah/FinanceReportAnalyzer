@@ -1,0 +1,35 @@
+[
+  {
+    "id": "test_01_top_glove",
+    "query": "the biggest glove maker in malaysia",
+    "expected_ticker": "7113.KL",
+    "expected_company": "Top Glove Corporation Bhd",
+    "sample_metrics": {
+      "rev_growth_qoq": 5.88,
+      "net_margin_pct": 32.64,
+      "annualized_pe": 9.87
+    }
+  },
+  {
+    "id": "test_02_tenaga",
+    "query": "malaysia national electricity power company",
+    "expected_ticker": "5347.KL",
+    "expected_company": "Tenaga Nasional Berhad",
+    "sample_metrics": {
+      "rev_growth_qoq": 3.45,
+      "net_margin_pct": 14.20,
+      "annualized_pe": 16.50
+    }
+  },
+  {
+    "id": "test_03_maybank",
+    "query": "1155",
+    "expected_ticker": "1155.KL",
+    "expected_company": "Malayan Banking Berhad",
+    "sample_metrics": {
+      "rev_growth_qoq": 4.12,
+      "net_margin_pct": 28.50,
+      "annualized_pe": 11.20
+    }
+  }
+]

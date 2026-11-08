@@ -1,0 +1,133 @@
+import time
+from typing import Optional, Any
+from google import genai
+from pydantic import BaseModel, Field
+
+
+class ExecutionTelemetry(BaseModel):
+    """Telemetry data capturing latency and token economics."""
+    model_used: str
+    is_fallback: bool = False
+    duration_seconds: float
+    input_tokens: int = 0
+    output_tokens: int = 0
+    estimated_cost_usd: float = 0.0
+
+
+class GatewayResponse(BaseModel):
+    """Unified response object returned by the AI Gateway."""
+    content: str
+    telemetry: ExecutionTelemetry
+
+class ResilientAIGateway:
+    """
+    Level 5 Production AI Gateway.
+    Provides automated fallback, latency tracking, and cost accounting.
+    """
+    # Pricing per 1M tokens (Standard Gemini Flash rates)
+    INPUT_COST_PER_M = 0.075   # $0.075 per 1M input tokens
+    OUTPUT_COST_PER_M = 0.30   # $0.30 per 1M output tokens
+
+    # Model hierarchy: Primary fast model -> Secondary fallback model
+    PRIMARY_MODEL = "gemini-2.5-flash"
+    FALLBACK_MODEL = "gemini-1.5-flash"  # or alternate provider/model
+
+    @classmethod
+    def calculate_cost(cls, input_tokens: int, output_tokens: int) -> float:
+        """Calculates token costs in USD."""
+        cost = (input_tokens / 1_000_000 * cls.INPUT_COST_PER_M) + (output_tokens / 1_000_000 * cls.OUTPUT_COST_PER_M)
+        return round(cost, 6)
+
+    @classmethod
+    def generate_with_fallback(
+        cls,
+        prompt: str,
+        config: Optional[dict] = None,
+        max_retries: int = 2
+    ) -> GatewayResponse:
+        """
+        Executes generation with automatic circuit-breaking and fallback.
+        """
+        client = genai.Client()
+        start_time = time.time()
+        
+        # 1. Attempt Primary Model
+        for attempt in range(max_retries):
+            try:
+                print(f"[Gateway] Dispatching request to PRIMARY model: '{cls.PRIMARY_MODEL}' (Attempt {attempt+1})...")
+                response = client.models.generate_content(
+                    model=cls.PRIMARY_MODEL,
+                    contents=prompt,
+                    config=config,
+                )
+                
+                duration = round(time.time() - start_time, 3)
+                
+                # Extract token usage from response metadata
+                usage = getattr(response, "usage_metadata", None)
+                in_tokens = getattr(usage, "prompt_token_count", 0) if usage else 0
+                out_tokens = getattr(usage, "candidates_token_count", 0) if usage else 0
+                cost = cls.calculate_cost(in_tokens, out_tokens)
+
+                telemetry = ExecutionTelemetry(
+                    model_used=cls.PRIMARY_MODEL,
+                    is_fallback=False,
+                    duration_seconds=duration,
+                    input_tokens=in_tokens,
+                    output_tokens=out_tokens,
+                    estimated_cost_usd=cost
+                )
+                return GatewayResponse(content=response.text, telemetry=telemetry)
+
+            except Exception as e:
+                print(f"⚠️ [Gateway Warning] Primary model attempt {attempt+1} failed: {e}")
+                time.sleep(0.5)
+
+        # 2. Circuit Breaker tripped: Fall back to Secondary Model
+        print(f"🚨 [Gateway Circuit Breaker] Tripping to FALLBACK model: '{cls.FALLBACK_MODEL}'...")
+        try:
+            fallback_response = client.models.generate_content(
+                model=cls.FALLBACK_MODEL,
+                contents=prompt,
+                config=config,
+            )
+            duration = round(time.time() - start_time, 3)
+            
+            usage = getattr(fallback_response, "usage_metadata", None)
+            in_tokens = getattr(usage, "prompt_token_count", 0) if usage else 0
+            out_tokens = getattr(usage, "candidates_token_count", 0) if usage else 0
+            cost = cls.calculate_cost(in_tokens, out_tokens)
+
+            telemetry = ExecutionTelemetry(
+                model_used=cls.FALLBACK_MODEL,
+                is_fallback=True,
+                duration_seconds=duration,
+                input_tokens=in_tokens,
+                output_tokens=out_tokens,
+                estimated_cost_usd=cost
+            )
+            return GatewayResponse(content=fallback_response.text, telemetry=telemetry)
+
+        except Exception as e:
+            raise RuntimeError(f"Critical Gateway Outage: All model endpoints failed. Root cause: {e}")
+
+if __name__ == "__main__":
+    print("\n" + "="*60)
+    print("   TESTING LEVEL 5: OPERABILITY & AI GATEWAY LAYER")
+    print("="*60)
+
+    test_prompt = "Provide a 1-sentence summary of what Bursa Malaysia is."
+
+    print("\n1. Testing Resilient Gateway Execution:")
+    gateway_result = ResilientAIGateway.generate_with_fallback(test_prompt)
+
+    print("\n--- Response Received ---")
+    print(f"Content: {gateway_result.content.strip()}")
+    
+    print("\n--- Gateway Telemetry & Economics ---")
+    tel = gateway_result.telemetry
+    print(f"Model Used:         {tel.model_used}")
+    print(f"Used Fallback:      {tel.is_fallback}")
+    print(f"Latency:            {tel.duration_seconds} seconds")
+    print(f"Token Count:        {tel.input_tokens} In / {tel.output_tokens} Out")
+    print(f"Cost of Request:    ${tel.estimated_cost_usd:.6f} USD")
