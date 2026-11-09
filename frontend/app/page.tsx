@@ -22,7 +22,9 @@ import {
   ArrowRight,
   Filter,
   Calendar,
-  FolderOpen
+  FolderOpen,
+  Sun,
+  Moon
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import {
@@ -165,11 +167,78 @@ function parseQuery(query: string) {
   };
 }
 
+function ThemeSwitch({ theme, onToggle }: { theme: "dark" | "light"; onToggle: () => void }) {
+  const isDark = theme === "dark";
+  return (
+    <button
+      onClick={onToggle}
+      type="button"
+      className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-[#1F2328] bg-slate-100 dark:bg-[#16191D] hover:bg-slate-200 dark:hover:bg-[#1F2328] text-slate-700 dark:text-[#F0F3F6] transition text-xs font-medium group active:scale-95 shadow-sm"
+      title={`Switch to ${isDark ? "Light" : "Dark"} Mode`}
+      aria-label={`Switch to ${isDark ? "Light" : "Dark"} Mode`}
+    >
+      {isDark ? (
+        <>
+          <Sun className="w-3.5 h-3.5 text-amber-400 transition-transform group-hover:rotate-45" />
+          <span className="hidden sm:inline text-[11px] text-[#8B949E] group-hover:text-white">Light Mode</span>
+        </>
+      ) : (
+        <>
+          <Moon className="w-3.5 h-3.5 text-blue-600 transition-transform group-hover:-rotate-12" />
+          <span className="hidden sm:inline text-[11px] text-slate-600 group-hover:text-slate-900">Dark Mode</span>
+        </>
+      )}
+    </button>
+  );
+}
+
 export default function App() {
   const [view, setView] = useState<"home" | "terminal">("home");
   const [activeCode, setActiveCode] = useState<string>("1155");
   const [searchQuery, setSearchQuery] = useState("");
   const [data, setData] = useState<any>(null);
+
+  // Theme state: light or dark mode
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+
+  useEffect(() => {
+    try {
+      const stored = (localStorage.getItem("theme") || localStorage.getItem("color-scheme")) as "dark" | "light" | null;
+      if (stored === "light" || stored === "dark") {
+        setTheme(stored);
+        applyTheme(stored);
+      } else {
+        const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const initial = prefersDark ? "dark" : "dark";
+        setTheme(initial);
+        applyTheme(initial);
+      }
+    } catch (e) {}
+  }, []);
+
+  const applyTheme = (t: "dark" | "light") => {
+    if (t === "dark") {
+      document.documentElement.classList.add("dark");
+      document.documentElement.classList.remove("light");
+    } else {
+      document.documentElement.classList.add("light");
+      document.documentElement.classList.remove("dark");
+    }
+    const meta = document.querySelector('meta[name="color-scheme"]');
+    if (meta) meta.setAttribute("content", t);
+  };
+
+  const toggleTheme = () => {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    applyTheme(next);
+    try {
+      localStorage.setItem("theme", next);
+      localStorage.setItem("color-scheme", next);
+    } catch (e) {}
+  };
+
+  const isDark = theme === "dark";
   
   // Loading interface states
   const [loading, setLoading] = useState(false);
@@ -419,11 +488,11 @@ export default function App() {
   const isPositive = (data?.stock?.change_pct || 0) >= 0;
 
   return (
-    <div className="min-h-screen bg-[#090A0C] text-[#F0F3F6] flex flex-col font-sans">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#090A0C] text-slate-900 dark:text-[#F0F3F6] flex flex-col font-sans transition-colors duration-150">
       
-      {/* 1. Header (Clean & Minimal: NO Logo and NO Upload Filing Button) */}
+      {/* 1. Header (Clean & Minimal with Theme Switch) */}
       {view === "terminal" && (
-        <header className="bg-[#121417] border-b border-[#1F2328] sticky top-0 z-40">
+        <header className="bg-white dark:bg-[#121417] border-b border-slate-200 dark:border-[#1F2328] sticky top-0 z-40 transition-colors">
           <div className="w-full max-w-[1600px] mx-auto px-3 sm:px-6 py-2.5 flex items-center justify-between gap-3">
             
             {/* Back to Start Page */}
@@ -432,7 +501,7 @@ export default function App() {
                 setView("home");
                 setAssistantOpen(false);
               }}
-              className="bg-[#16191D] hover:bg-[#1F2328] text-[#8B949E] hover:text-[#F0F3F6] px-3 py-1.5 rounded border border-[#1F2328] flex items-center space-x-1.5 transition text-xs font-medium"
+              className="bg-slate-100 dark:bg-[#16191D] hover:bg-slate-200 dark:hover:bg-[#1F2328] text-slate-700 dark:text-[#8B949E] hover:text-slate-900 dark:hover:text-[#F0F3F6] px-3 py-1.5 rounded border border-slate-200 dark:border-[#1F2328] flex items-center space-x-1.5 transition text-xs font-medium"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>Start Page</span>
@@ -441,41 +510,54 @@ export default function App() {
             {/* Quick Switch Stock Search Bar */}
             <form onSubmit={handleSearchSubmit} className="flex-1 max-w-md flex items-center">
               <div className="relative w-full">
-                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#8B949E]" />
+                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#8B949E]" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Switch company (e.g. Tenaga, Maybank, CIMB, 5347)..."
-                  className="w-full bg-[#090A0C] border border-[#1F2328] rounded pl-8 pr-16 py-1.5 text-xs text-[#F0F3F6] placeholder:text-[#6E7681] focus:outline-none focus:border-blue-500 transition"
+                  className="w-full bg-slate-100 dark:bg-[#090A0C] border border-slate-200 dark:border-[#1F2328] rounded pl-8 pr-16 py-1.5 text-xs text-slate-900 dark:text-[#F0F3F6] placeholder:text-slate-400 dark:placeholder:text-[#6E7681] focus:outline-none focus:border-blue-500 transition"
                 />
                 <button
                   type="submit"
                   disabled={loading}
-                  className="absolute right-1 top-1/2 -translate-y-1/2 bg-[#1F2328] hover:bg-[#30363D] text-[#F0F3F6] px-2.5 py-0.5 rounded text-xs font-medium border border-[#30363D] transition disabled:opacity-40"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 bg-slate-200 dark:bg-[#1F2328] hover:bg-slate-300 dark:hover:bg-[#30363D] text-slate-800 dark:text-[#F0F3F6] px-2.5 py-0.5 rounded text-xs font-medium border border-slate-300 dark:border-[#30363D] transition disabled:opacity-40"
                 >
                   {loading ? "..." : "Go"}
                 </button>
               </div>
             </form>
 
-            <span className="text-xs text-[#8B949E] hidden sm:inline">
-              Bursa Malaysia
-            </span>
+            <div className="flex items-center space-x-2.5">
+              <ThemeSwitch theme={theme} onToggle={toggleTheme} />
+              <span className="text-xs text-slate-500 dark:text-[#8B949E] hidden sm:inline font-medium">
+                Bursa Malaysia
+              </span>
+            </div>
           </div>
+        </header>
+      )}
+
+      {/* Start Page Header with Theme Switch */}
+      {view === "home" && (
+        <header className="w-full max-w-4xl mx-auto px-4 sm:px-6 pt-4 pb-0 flex items-center justify-between">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-[#8B949E]">
+            Bursa Intelligence
+          </span>
+          <ThemeSwitch theme={theme} onToggle={toggleTheme} />
         </header>
       )}
 
       {/* 2. VIEW 1: CLEAN MINIMAL START PAGE */}
       {view === "home" && (
-        <main className="flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 py-10 sm:py-16 flex flex-col items-center justify-center space-y-8">
+        <main className="flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-12 flex flex-col items-center justify-center space-y-8">
           
           {/* Minimalist Hero */}
           <div className="text-center space-y-2 max-w-xl w-full">
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white tracking-tight">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-slate-900 dark:text-white tracking-tight">
               Bursa Market Research
             </h1>
-            <p className="text-[#8B949E] text-xs sm:text-sm leading-relaxed max-w-md mx-auto">
+            <p className="text-slate-600 dark:text-[#8B949E] text-xs sm:text-sm leading-relaxed max-w-md mx-auto">
               Search any company or ticker code to review quarterly earnings, financial statements, and explore insights.
             </p>
           </div>
@@ -483,36 +565,36 @@ export default function App() {
           {/* Clean Search Box - NO POPUP WHILE TYPING; ONLY OPENS AFTER USER PRESSES ENTER */}
           <div className="w-full max-w-xl relative">
             <form onSubmit={handleSearchSubmit} className="relative">
-              <div className="relative flex items-center shadow-lg">
-                <Search className="w-4 h-4 sm:w-5 sm:h-5 absolute left-3.5 text-[#8B949E]" />
+              <div className="relative flex items-center shadow-lg rounded-lg">
+                <Search className="w-4 h-4 sm:w-5 sm:h-5 absolute left-3.5 text-slate-400 dark:text-[#8B949E]" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Enter company or question (e.g. 'analyse report for Tenaga')..."
-                  className="w-full bg-[#121417] border border-[#1F2328] hover:border-[#30363D] focus:border-blue-500 rounded-lg pl-10 pr-24 py-3 sm:py-3.5 text-xs sm:text-sm text-white placeholder:text-[#6E7681] focus:outline-none transition"
+                  className="w-full bg-white dark:bg-[#121417] border border-slate-200 dark:border-[#1F2328] hover:border-slate-300 dark:hover:border-[#30363D] focus:border-blue-500 rounded-lg pl-10 pr-24 py-3 sm:py-3.5 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-[#6E7681] focus:outline-none transition shadow-sm"
                   autoFocus
                 />
                 <button
                   type="submit"
                   disabled={loading || !searchQuery.trim()}
-                  className="absolute right-1.5 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded text-xs font-semibold disabled:opacity-40 flex items-center space-x-1 transition"
+                  className="absolute right-1.5 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded text-xs font-semibold disabled:opacity-40 flex items-center space-x-1 transition shadow-sm"
                 >
                   <span>Search</span>
                   <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             </form>
-            <p className="text-[11px] text-[#8B949E] mt-2 text-center">
-              Press <kbd className="px-1.5 py-0.5 bg-[#16191D] border border-[#1F2328] rounded text-[10px] text-white">Enter</kbd> to confirm and search
+            <p className="text-[11px] text-slate-500 dark:text-[#8B949E] mt-2 text-center">
+              Press <kbd className="px-1.5 py-0.5 bg-slate-100 dark:bg-[#16191D] border border-slate-200 dark:border-[#1F2328] rounded text-[10px] text-slate-700 dark:text-white">Enter</kbd> to confirm and search
             </p>
           </div>
 
           {/* Popular Equities Grid */}
           <div className="w-full space-y-2">
-            <div className="flex items-center justify-between border-b border-[#1F2328] pb-1.5">
-              <span className="text-xs font-semibold text-white">Popular Companies</span>
-              <span className="text-[11px] text-[#8B949E]">Bursa Malaysia</span>
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#1F2328] pb-1.5">
+              <span className="text-xs font-semibold text-slate-900 dark:text-white">Popular Companies</span>
+              <span className="text-[11px] text-slate-500 dark:text-[#8B949E]">Bursa Malaysia</span>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
@@ -521,21 +603,21 @@ export default function App() {
                   key={company.code}
                   onClick={() => loadStockData(company.code)}
                   disabled={loading}
-                  className="bg-[#121417] hover:bg-[#16191D] p-3 rounded border border-[#1F2328] hover:border-slate-700 text-left transition flex flex-col justify-between group active:scale-[0.99]"
+                  className="bg-white dark:bg-[#121417] hover:bg-slate-50 dark:hover:bg-[#16191D] p-3 rounded border border-slate-200 dark:border-[#1F2328] hover:border-slate-300 dark:hover:border-slate-700 text-left transition flex flex-col justify-between group active:scale-[0.99] shadow-sm"
                 >
                   <div className="flex items-center justify-between w-full mb-1">
-                    <span className="text-xs font-bold text-white group-hover:text-blue-400">
+                    <span className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">
                       {company.name}
                     </span>
-                    <span className={`text-[11px] font-semibold tabular-nums ${company.positive ? "text-emerald-400" : "text-rose-400"}`}>
+                    <span className={`text-[11px] font-semibold tabular-nums ${company.positive ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
                       {company.positive ? "+" : ""}{company.change.toFixed(2)}%
                     </span>
                   </div>
                   <div className="flex items-baseline justify-between mt-1">
-                    <span className="text-[11px] text-[#8B949E]">
+                    <span className="text-[11px] text-slate-500 dark:text-[#8B949E]">
                       {company.ticker}
                     </span>
-                    <span className="text-xs font-bold text-white tabular-nums">
+                    <span className="text-xs font-bold text-slate-900 dark:text-white tabular-nums">
                       RM {company.price.toFixed(2)}
                     </span>
                   </div>
@@ -546,31 +628,31 @@ export default function App() {
 
           {/* Market Overview Benchmarks */}
           <div className="w-full space-y-2">
-            <div className="flex items-center justify-between border-b border-[#1F2328] pb-1.5">
-              <span className="text-xs font-semibold text-white">Market Overview</span>
-              <span className="text-[11px] text-[#8B949E]">Live Benchmarks</span>
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#1F2328] pb-1.5">
+              <span className="text-xs font-semibold text-slate-900 dark:text-white">Market Overview</span>
+              <span className="text-[11px] text-slate-500 dark:text-[#8B949E]">Live Benchmarks</span>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5 text-xs">
-              <div className="bg-[#121417] p-3 rounded border border-[#1F2328]">
-                <span className="text-[11px] text-[#8B949E] block mb-0.5">FBM KLCI Index</span>
-                <span className="text-sm font-bold text-white tabular-nums">1,624.18</span>
-                <span className="text-[11px] text-emerald-400 block font-medium mt-0.5">+5.12 (+0.32%)</span>
+              <div className="bg-white dark:bg-[#121417] p-3 rounded border border-slate-200 dark:border-[#1F2328] shadow-sm">
+                <span className="text-[11px] text-slate-500 dark:text-[#8B949E] block mb-0.5">FBM KLCI Index</span>
+                <span className="text-sm font-bold text-slate-900 dark:text-white tabular-nums">1,624.18</span>
+                <span className="text-[11px] text-emerald-600 dark:text-emerald-400 block font-medium mt-0.5">+5.12 (+0.32%)</span>
               </div>
-              <div className="bg-[#121417] p-3 rounded border border-[#1F2328]">
-                <span className="text-[11px] text-[#8B949E] block mb-0.5">USD / MYR</span>
-                <span className="text-sm font-bold text-white tabular-nums">4.4125</span>
-                <span className="text-[11px] text-emerald-400 block font-medium mt-0.5">-0.0065 (-0.15%)</span>
+              <div className="bg-white dark:bg-[#121417] p-3 rounded border border-slate-200 dark:border-[#1F2328] shadow-sm">
+                <span className="text-[11px] text-slate-500 dark:text-[#8B949E] block mb-0.5">USD / MYR</span>
+                <span className="text-sm font-bold text-slate-900 dark:text-white tabular-nums">4.4125</span>
+                <span className="text-[11px] text-emerald-600 dark:text-emerald-400 block font-medium mt-0.5">-0.0065 (-0.15%)</span>
               </div>
-              <div className="bg-[#121417] p-3 rounded border border-[#1F2328]">
-                <span className="text-[11px] text-[#8B949E] block mb-0.5">Brent Crude</span>
-                <span className="text-sm font-bold text-white tabular-nums">$73.87</span>
-                <span className="text-[11px] text-emerald-400 block font-medium mt-0.5">+$0.48 (+0.65%)</span>
+              <div className="bg-white dark:bg-[#121417] p-3 rounded border border-slate-200 dark:border-[#1F2328] shadow-sm">
+                <span className="text-[11px] text-slate-500 dark:text-[#8B949E] block mb-0.5">Brent Crude</span>
+                <span className="text-sm font-bold text-slate-900 dark:text-white tabular-nums">$73.87</span>
+                <span className="text-[11px] text-emerald-600 dark:text-emerald-400 block font-medium mt-0.5">+$0.48 (+0.65%)</span>
               </div>
-              <div className="bg-[#121417] p-3 rounded border border-[#1F2328]">
-                <span className="text-[11px] text-[#8B949E] block mb-0.5">BNM OPR Rate</span>
-                <span className="text-sm font-bold text-white tabular-nums">3.00%</span>
-                <span className="text-[11px] text-[#8B949E] block font-medium mt-0.5">Neutral Policy</span>
+              <div className="bg-white dark:bg-[#121417] p-3 rounded border border-slate-200 dark:border-[#1F2328] shadow-sm">
+                <span className="text-[11px] text-slate-500 dark:text-[#8B949E] block mb-0.5">BNM OPR Rate</span>
+                <span className="text-sm font-bold text-slate-900 dark:text-white tabular-nums">3.00%</span>
+                <span className="text-[11px] text-slate-500 dark:text-[#8B949E] block font-medium mt-0.5">Neutral Policy</span>
               </div>
             </div>
           </div>
@@ -579,19 +661,19 @@ export default function App() {
           {/* USER CONFIRMATION POPUP: ONLY TRIGGERS ONCE USER FINISHES INPUT AND ENTERS */}
           {/* ========================================================================= */}
           {assistantOpen && (
-            <div className="fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 w-[92%] max-w-lg z-40 bg-[#12161f] border border-blue-500/50 shadow-2xl rounded-xl p-4 text-xs animate-in fade-in slide-in-from-bottom-3 duration-200">
+            <div className="fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 w-[92%] max-w-lg z-40 bg-white dark:bg-[#12161f] border border-slate-300 dark:border-blue-500/50 shadow-2xl rounded-xl p-4 text-xs animate-in fade-in slide-in-from-bottom-3 duration-200">
               
               {/* Header */}
-              <div className="flex items-center justify-between border-b border-[#1F2328] pb-2 mb-2.5">
+              <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#1F2328] pb-2 mb-2.5">
                 <div className="flex items-center space-x-2">
-                  <div className="w-5 h-5 rounded-full bg-blue-600/20 text-blue-400 flex items-center justify-center">
+                  <div className="w-5 h-5 rounded-full bg-blue-600/10 dark:bg-blue-600/20 text-blue-600 dark:text-blue-400 flex items-center justify-center">
                     <Sparkles className="w-3 h-3" />
                   </div>
-                  <span className="font-bold text-white text-xs">Confirm Target & Query</span>
+                  <span className="font-bold text-slate-900 dark:text-white text-xs">Confirm Target & Query</span>
                 </div>
                 <button
                   onClick={() => setAssistantOpen(false)}
-                  className="text-[#8B949E] hover:text-white p-1 rounded hover:bg-[#1F2328] transition"
+                  className="text-slate-500 dark:text-[#8B949E] hover:text-slate-900 dark:hover:text-white p-1 rounded hover:bg-slate-100 dark:hover:bg-[#1F2328] transition"
                   title="Close"
                 >
                   <X className="w-4 h-4" />
@@ -601,27 +683,27 @@ export default function App() {
               {/* Case 1: Company Matched */}
               {parsedIntent.company ? (
                 <div className="space-y-3">
-                  <div className="bg-[#090c14] border border-slate-800 p-3 rounded-lg">
-                    <div className="flex items-center justify-between text-[11px] text-[#8B949E] mb-1">
+                  <div className="bg-slate-50 dark:bg-[#090c14] border border-slate-200 dark:border-slate-800 p-3 rounded-lg">
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-[#8B949E] mb-1">
                       <span>Target Company:</span>
-                      <span className="text-emerald-400 font-medium flex items-center space-x-1">
+                      <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center space-x-1">
                         <Check className="w-3 h-3" />
                         <span>Identified</span>
                       </span>
                     </div>
                     <div className="flex items-baseline justify-between">
-                      <span className="text-white font-bold text-sm">
+                      <span className="text-slate-900 dark:text-white font-bold text-sm">
                         {parsedIntent.company.name} ({parsedIntent.company.ticker})
                       </span>
-                      <span className="text-blue-400 font-bold tabular-nums">
+                      <span className="text-blue-600 dark:text-blue-400 font-bold tabular-nums">
                         RM {parsedIntent.company.price.toFixed(2)}
                       </span>
                     </div>
 
                     {parsedIntent.instruction ? (
-                      <div className="mt-2.5 pt-2 border-t border-slate-800 text-[11px]">
-                        <span className="text-[#8B949E] block mb-1">Your analytical request:</span>
-                        <div className="text-blue-300 bg-[#141b28] p-2 rounded border border-blue-900/40 font-medium">
+                      <div className="mt-2.5 pt-2 border-t border-slate-200 dark:border-slate-800 text-[11px]">
+                        <span className="text-slate-500 dark:text-[#8B949E] block mb-1">Your analytical request:</span>
+                        <div className="text-blue-900 dark:text-blue-300 bg-blue-50 dark:bg-[#141b28] p-2 rounded border border-blue-200 dark:border-blue-900/40 font-medium">
                           &quot;{parsedIntent.instruction}&quot;
                         </div>
                       </div>
@@ -644,15 +726,15 @@ export default function App() {
                   </button>
 
                   {/* Quick Suggestions */}
-                  <div className="pt-2 border-t border-[#1F2328]">
-                    <span className="text-[10px] text-[#8B949E] block mb-1.5">Or choose a common topic:</span>
+                  <div className="pt-2 border-t border-slate-200 dark:border-[#1F2328]">
+                    <span className="text-[10px] text-slate-500 dark:text-[#8B949E] block mb-1.5">Or choose a common topic:</span>
                     <div className="flex flex-wrap gap-1.5">
                       <button
                         onClick={() => {
                           const comp = parsedIntent.company!;
                           loadStockData(comp.code, "Summarize revenue drivers and segment performance from the latest quarterly report.");
                         }}
-                        className="bg-[#16191D] hover:bg-[#1F2328] text-[#8B949E] hover:text-white text-[11px] px-2 py-1 rounded border border-[#1F2328] transition"
+                        className="bg-slate-100 dark:bg-[#16191D] hover:bg-slate-200 dark:hover:bg-[#1F2328] text-slate-700 dark:text-[#8B949E] hover:text-slate-900 dark:hover:text-white text-[11px] px-2 py-1 rounded border border-slate-200 dark:border-[#1F2328] transition"
                       >
                         Revenue & Margins
                       </button>
@@ -661,7 +743,7 @@ export default function App() {
                           const comp = parsedIntent.company!;
                           loadStockData(comp.code, "What are the management's key operating risks and market outlook?");
                         }}
-                        className="bg-[#16191D] hover:bg-[#1F2328] text-[#8B949E] hover:text-white text-[11px] px-2 py-1 rounded border border-[#1F2328] transition"
+                        className="bg-slate-100 dark:bg-[#16191D] hover:bg-slate-200 dark:hover:bg-[#1F2328] text-slate-700 dark:text-[#8B949E] hover:text-slate-900 dark:hover:text-white text-[11px] px-2 py-1 rounded border border-slate-200 dark:border-[#1F2328] transition"
                       >
                         Operating Outlook
                       </button>
@@ -670,7 +752,7 @@ export default function App() {
                           const comp = parsedIntent.company!;
                           loadStockData(comp.code, "Summarize total borrowings, gearing ratio, and cash position.");
                         }}
-                        className="bg-[#16191D] hover:bg-[#1F2328] text-[#8B949E] hover:text-white text-[11px] px-2 py-1 rounded border border-[#1F2328] transition"
+                        className="bg-slate-100 dark:bg-[#16191D] hover:bg-slate-200 dark:hover:bg-[#1F2328] text-slate-700 dark:text-[#8B949E] hover:text-slate-900 dark:hover:text-white text-[11px] px-2 py-1 rounded border border-slate-200 dark:border-[#1F2328] transition"
                       >
                         Debt & Cash
                       </button>
@@ -680,7 +762,7 @@ export default function App() {
               ) : (
                 /* Case 2: Ambiguous Query - Quick Company Selector */
                 <div className="space-y-2.5">
-                  <p className="text-[#8B949E] text-xs">
+                  <p className="text-slate-500 dark:text-[#8B949E] text-xs">
                     Please select a company to run your query:
                   </p>
                   <div className="grid grid-cols-2 gap-2">
@@ -691,13 +773,13 @@ export default function App() {
                           const instruction = searchQuery.trim();
                           loadStockData(c.code, instruction);
                         }}
-                        className="bg-[#090c14] hover:bg-[#16191D] text-left p-2.5 border border-slate-800 hover:border-blue-500 rounded-lg transition flex items-center justify-between"
+                        className="bg-slate-50 dark:bg-[#090c14] hover:bg-slate-100 dark:hover:bg-[#16191D] text-left p-2.5 border border-slate-200 dark:border-slate-800 hover:border-blue-500 rounded-lg transition flex items-center justify-between"
                       >
                         <div>
-                          <span className="font-bold text-white block text-xs">{c.name}</span>
-                          <span className="text-[10px] text-[#8B949E]">{c.ticker}</span>
+                          <span className="font-bold text-slate-900 dark:text-white block text-xs">{c.name}</span>
+                          <span className="text-[10px] text-slate-500 dark:text-[#8B949E]">{c.ticker}</span>
                         </div>
-                        <span className="text-xs text-blue-400 font-medium">Select →</span>
+                        <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">Select →</span>
                       </button>
                     ))}
                   </div>
@@ -715,11 +797,13 @@ export default function App() {
         <main className="flex-1 w-full max-w-[1600px] mx-auto p-2 sm:p-4 space-y-3">
           
           {/* Mobile Tab Switcher (3 Tabs: Filings, Financials, Copilot) */}
-          <div className="lg:hidden bg-[#121417] border border-[#1F2328] rounded p-1 grid grid-cols-3 gap-1 text-xs">
+          <div className="lg:hidden bg-white dark:bg-[#121417] border border-slate-200 dark:border-[#1F2328] rounded p-1 grid grid-cols-3 gap-1 text-xs">
             <button
               onClick={() => setActiveTab("filings")}
               className={`py-1.5 px-2 rounded font-semibold transition text-center flex items-center justify-center space-x-1 ${
-                activeTab === "filings" ? "bg-blue-600 text-white" : "text-[#8B949E] hover:text-white"
+                activeTab === "filings"
+                  ? "bg-blue-600 text-white"
+                  : "text-slate-600 dark:text-[#8B949E] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1F2328]"
               }`}
             >
               <FileText className="w-3.5 h-3.5" />
@@ -728,7 +812,9 @@ export default function App() {
             <button
               onClick={() => setActiveTab("overview")}
               className={`py-1.5 px-2 rounded font-semibold transition text-center flex items-center justify-center space-x-1 ${
-                activeTab === "overview" ? "bg-blue-600 text-white" : "text-[#8B949E] hover:text-white"
+                activeTab === "overview"
+                  ? "bg-blue-600 text-white"
+                  : "text-slate-600 dark:text-[#8B949E] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1F2328]"
               }`}
             >
               <BarChart2 className="w-3.5 h-3.5" />
@@ -737,7 +823,9 @@ export default function App() {
             <button
               onClick={() => setActiveTab("chat")}
               className={`py-1.5 px-2 rounded font-semibold transition text-center flex items-center justify-center space-x-1 ${
-                activeTab === "chat" ? "bg-blue-600 text-white" : "text-[#8B949E] hover:text-white"
+                activeTab === "chat"
+                  ? "bg-blue-600 text-white"
+                  : "text-slate-600 dark:text-[#8B949E] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1F2328]"
               }`}
             >
               <MessageSquare className="w-3.5 h-3.5" />
@@ -746,22 +834,22 @@ export default function App() {
           </div>
 
           {/* Stock Header Banner */}
-          <div className="bg-[#121417] border border-[#1F2328] rounded-lg p-3 sm:p-4 flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="bg-white dark:bg-[#121417] border border-slate-200 dark:border-[#1F2328] rounded-lg p-3 sm:p-4 flex flex-wrap items-center justify-between gap-3 text-xs">
             <div className="flex items-center space-x-3">
               <div>
                 <div className="flex items-center space-x-2">
-                  <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight">
+                  <h1 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white tracking-tight">
                     {data.stock.name}
                   </h1>
-                  <span className="bg-[#16191D] text-[#8B949E] text-xs px-2 py-0.5 rounded border border-[#1F2328] font-mono">
+                  <span className="bg-slate-100 dark:bg-[#16191D] text-slate-700 dark:text-[#8B949E] text-xs px-2 py-0.5 rounded border border-slate-200 dark:border-[#1F2328] font-mono">
                     {data.stock.ticker}
                   </span>
                 </div>
                 <div className="flex items-baseline space-x-2 mt-0.5">
-                  <span className="text-xl sm:text-2xl font-bold text-white tabular-nums">
+                  <span className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tabular-nums">
                     RM {data.stock.price.toFixed(2)}
                   </span>
-                  <span className={`text-xs font-semibold tabular-nums flex items-center ${isPositive ? "text-emerald-400" : "text-rose-400"}`}>
+                  <span className={`text-xs font-semibold tabular-nums flex items-center ${isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
                     {isPositive ? <TrendingUp className="w-3.5 h-3.5 mr-0.5" /> : <TrendingDown className="w-3.5 h-3.5 mr-0.5" />}
                     {isPositive ? "+" : ""}{data.stock.change_pct.toFixed(2)}% Today
                   </span>
@@ -771,27 +859,27 @@ export default function App() {
 
             {/* Metrics Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 w-full sm:w-auto text-xs">
-              <div className="bg-[#090A0C] p-2 rounded border border-[#1F2328]">
-                <span className="text-[10px] text-[#8B949E] block">Market Cap</span>
-                <span className="text-white font-semibold tabular-nums">
+              <div className="bg-slate-50 dark:bg-[#090A0C] p-2 rounded border border-slate-200 dark:border-[#1F2328]">
+                <span className="text-[10px] text-slate-500 dark:text-[#8B949E] block">Market Cap</span>
+                <span className="text-slate-900 dark:text-white font-semibold tabular-nums">
                   RM {data.stock.market_cap ? (data.stock.market_cap / 1_000_000_000).toFixed(1) + "B" : "122.5B"}
                 </span>
               </div>
-              <div className="bg-[#090A0C] p-2 rounded border border-[#1F2328]">
-                <span className="text-[10px] text-[#8B949E] block">P/E Ratio</span>
-                <span className="text-white font-semibold tabular-nums">
+              <div className="bg-slate-50 dark:bg-[#090A0C] p-2 rounded border border-slate-200 dark:border-[#1F2328]">
+                <span className="text-[10px] text-slate-500 dark:text-[#8B949E] block">P/E Ratio</span>
+                <span className="text-slate-900 dark:text-white font-semibold tabular-nums">
                   {data.metrics.annualized_pe ? `${data.metrics.annualized_pe}x` : "12.8x"}
                 </span>
               </div>
-              <div className="bg-[#090A0C] p-2 rounded border border-[#1F2328]">
-                <span className="text-[10px] text-[#8B949E] block">Operating Margin</span>
-                <span className="text-emerald-400 font-semibold tabular-nums">
+              <div className="bg-slate-50 dark:bg-[#090A0C] p-2 rounded border border-slate-200 dark:border-[#1F2328]">
+                <span className="text-[10px] text-slate-500 dark:text-[#8B949E] block">Operating Margin</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-semibold tabular-nums">
                   {data.metrics.net_margin_pct ? `${data.metrics.net_margin_pct}%` : "32.6%"}
                 </span>
               </div>
-              <div className="bg-[#090A0C] p-2 rounded border border-[#1F2328]">
-                <span className="text-[10px] text-[#8B949E] block">Gearing Ratio</span>
-                <span className="text-white font-semibold tabular-nums">
+              <div className="bg-slate-50 dark:bg-[#090A0C] p-2 rounded border border-slate-200 dark:border-[#1F2328]">
+                <span className="text-[10px] text-slate-500 dark:text-[#8B949E] block">Gearing Ratio</span>
+                <span className="text-slate-900 dark:text-white font-semibold tabular-nums">
                   {data.metrics.gearing_ratio ? `${data.metrics.gearing_ratio}x` : "0.45x"}
                 </span>
               </div>
@@ -803,28 +891,30 @@ export default function App() {
             
             {/* 1. LEFT COLUMN: Financial Reports & Public Disclosures List */}
             <div className={`lg:col-span-3 space-y-2.5 ${activeTab === "filings" ? "block" : "hidden lg:block"}`}>
-              <div className="bg-[#121417] border border-[#1F2328] rounded-lg p-3 space-y-2.5">
+              <div className="bg-white dark:bg-[#121417] border border-slate-200 dark:border-[#1F2328] rounded-lg p-3 space-y-2.5">
                 
                 {/* Header */}
-                <div className="flex items-center justify-between border-b border-[#1F2328] pb-2">
+                <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#1F2328] pb-2">
                   <div className="flex items-center space-x-2">
-                    <FileText className="w-4 h-4 text-blue-400" />
+                    <FileText className="w-4 h-4 text-blue-500 dark:text-blue-400" />
                     <div>
-                      <h3 className="font-semibold text-xs text-white">Financial Reports</h3>
-                      <p className="text-[10px] text-[#8B949E]">Official Disclosures</p>
+                      <h3 className="font-semibold text-xs text-slate-900 dark:text-white">Financial Reports</h3>
+                      <p className="text-[10px] text-slate-500 dark:text-[#8B949E]">Official Disclosures</p>
                     </div>
                   </div>
-                  <span className="text-[10px] font-mono bg-[#16191D] text-slate-300 px-2 py-0.5 rounded border border-[#1F2328]">
+                  <span className="text-[10px] font-mono bg-slate-100 dark:bg-[#16191D] text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded border border-slate-200 dark:border-[#1F2328]">
                     {(data.filings || []).length} Available
                   </span>
                 </div>
 
                 {/* Filter Tabs */}
-                <div className="flex items-center space-x-1 bg-[#090A0C] border border-[#1F2328] p-0.5 rounded text-[11px]">
+                <div className="flex items-center space-x-1 bg-slate-100 dark:bg-[#090A0C] border border-slate-200 dark:border-[#1F2328] p-0.5 rounded text-[11px]">
                   <button
                     onClick={() => setFilingsFilter("all")}
                     className={`flex-1 py-1 rounded font-medium transition text-center ${
-                      filingsFilter === "all" ? "bg-blue-600 text-white" : "text-[#8B949E] hover:text-white"
+                      filingsFilter === "all"
+                        ? "bg-blue-600 text-white shadow-sm"
+                        : "text-slate-600 dark:text-[#8B949E] hover:text-slate-900 dark:hover:text-white"
                     }`}
                   >
                     All ({(data.filings || []).length})
@@ -832,7 +922,9 @@ export default function App() {
                   <button
                     onClick={() => setFilingsFilter("quarterly")}
                     className={`flex-1 py-1 rounded font-medium transition text-center ${
-                      filingsFilter === "quarterly" ? "bg-blue-600 text-white" : "text-[#8B949E] hover:text-white"
+                      filingsFilter === "quarterly"
+                        ? "bg-blue-600 text-white shadow-sm"
+                        : "text-slate-600 dark:text-[#8B949E] hover:text-slate-900 dark:hover:text-white"
                     }`}
                   >
                     Quarterly
@@ -840,7 +932,9 @@ export default function App() {
                   <button
                     onClick={() => setFilingsFilter("annual")}
                     className={`flex-1 py-1 rounded font-medium transition text-center ${
-                      filingsFilter === "annual" ? "bg-blue-600 text-white" : "text-[#8B949E] hover:text-white"
+                      filingsFilter === "annual"
+                        ? "bg-blue-600 text-white shadow-sm"
+                        : "text-slate-600 dark:text-[#8B949E] hover:text-slate-900 dark:hover:text-white"
                     }`}
                   >
                     Annual
@@ -863,51 +957,51 @@ export default function App() {
                           onClick={() => setSelectedFiling(f)}
                           className={`p-2.5 rounded border transition cursor-pointer text-left ${
                             isSelected
-                              ? "bg-[#161d28] border-blue-500/70 shadow-sm"
-                              : "bg-[#090A0C] border-[#1F2328] hover:border-slate-700 hover:bg-[#12161f]"
+                              ? "bg-blue-50/70 dark:bg-[#161d28] border-blue-500/70 shadow-sm"
+                              : "bg-slate-50 dark:bg-[#090A0C] border-slate-200 dark:border-[#1F2328] hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-100/70 dark:hover:bg-[#12161f]"
                           }`}
                         >
                           {/* Top Row: Period badge + Latest indicator + Type */}
                           <div className="flex items-center justify-between mb-1.5">
                             <div className="flex items-center space-x-1.5">
-                              <span className="text-xs font-bold text-white font-mono bg-[#16191D] px-1.5 py-0.5 rounded border border-[#1F2328]">
+                              <span className="text-xs font-bold text-slate-900 dark:text-white font-mono bg-slate-200/80 dark:bg-[#16191D] px-1.5 py-0.5 rounded border border-slate-300 dark:border-[#1F2328]">
                                 {f.period}
                               </span>
                               {f.is_latest && (
-                                <span className="text-[10px] bg-emerald-950/70 text-emerald-400 border border-emerald-800/60 px-1.5 py-0.2 rounded font-semibold flex items-center">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse mr-1"></span>
+                                <span className="text-[10px] bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800/60 px-1.5 py-0.2 rounded font-semibold flex items-center">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse mr-1"></span>
                                   Latest
                                 </span>
                               )}
                             </div>
-                            <span className="text-[10px] text-[#8B949E] font-medium">
+                            <span className="text-[10px] text-slate-500 dark:text-[#8B949E] font-medium">
                               {f.type}
                             </span>
                           </div>
 
                           {/* Filing Title */}
-                          <p className="text-xs font-medium text-slate-200 line-clamp-2 mb-1.5 leading-snug">
+                          <p className="text-xs font-medium text-slate-800 dark:text-slate-200 line-clamp-2 mb-1.5 leading-snug">
                             {f.title}
                           </p>
 
                           {/* Period Ended & Release Date */}
-                          <div className="text-[11px] text-[#8B949E] space-y-0.5 mb-2">
+                          <div className="text-[11px] text-slate-500 dark:text-[#8B949E] space-y-0.5 mb-2">
                             <div className="flex items-center justify-between">
                               <span>Period Ended:</span>
-                              <span className="text-slate-300 font-mono">{f.period_ended}</span>
+                              <span className="text-slate-700 dark:text-slate-300 font-mono">{f.period_ended}</span>
                             </div>
                             <div className="flex items-center justify-between">
                               <span>Released Date:</span>
-                              <span className="text-slate-300 font-mono">{f.release_date}</span>
+                              <span className="text-slate-700 dark:text-slate-300 font-mono">{f.release_date}</span>
                             </div>
                           </div>
 
                           {/* Financial Metric Badges + Quick Action */}
-                          <div className="flex items-center justify-between pt-1.5 border-t border-[#1F2328] text-[11px]">
-                            <div className="text-[11px] text-[#8B949E]">
-                              <span>Rev: <strong className="text-white font-mono">RM {f.revenue_m?.toLocaleString()}M</strong></span>
-                              <span className="mx-1 text-[#484F58]">•</span>
-                              <span>PAT: <strong className="text-emerald-400 font-mono">RM {f.profit_m?.toLocaleString()}M</strong></span>
+                          <div className="flex items-center justify-between pt-1.5 border-t border-slate-200 dark:border-[#1F2328] text-[11px]">
+                            <div className="text-[11px] text-slate-500 dark:text-[#8B949E]">
+                              <span>Rev: <strong className="text-slate-900 dark:text-white font-mono">RM {f.revenue_m?.toLocaleString()}M</strong></span>
+                              <span className="mx-1 text-slate-300 dark:text-[#484F58]">•</span>
+                              <span>PAT: <strong className="text-emerald-600 dark:text-emerald-400 font-mono">RM {f.profit_m?.toLocaleString()}M</strong></span>
                             </div>
                             <button
                               disabled={chatLoading}
@@ -922,11 +1016,11 @@ export default function App() {
                                   data?.stock?.code || activeCode
                                 );
                               }}
-                              className="text-[10px] text-blue-400 hover:text-white bg-blue-950/40 hover:bg-blue-600 px-2 py-0.5 rounded border border-blue-900/50 hover:border-blue-500 transition font-medium flex items-center space-x-1 disabled:opacity-50"
+                              className="text-[10px] text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-white bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-600 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-900/50 hover:border-blue-300 dark:hover:border-blue-500 transition font-medium flex items-center space-x-1 disabled:opacity-50"
                               title="Ask Copilot about this filing"
                             >
                               {chatLoading && selectedFiling?.id === f.id ? (
-                                <RefreshCw className="w-3 h-3 animate-spin text-blue-400" />
+                                <RefreshCw className="w-3 h-3 animate-spin text-blue-500 dark:text-blue-400" />
                               ) : (
                                 <Sparkles className="w-3 h-3" />
                               )}
@@ -939,8 +1033,8 @@ export default function App() {
                 </div>
 
                 {/* Footer note in filings panel */}
-                <div className="pt-2 border-t border-[#1F2328] text-[10px] text-[#8B949E] flex items-center space-x-1">
-                  <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
+                <div className="pt-2 border-t border-slate-200 dark:border-[#1F2328] text-[10px] text-slate-500 dark:text-[#8B949E] flex items-center space-x-1">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
                   <span>Verified Bursa Malaysia public filings</span>
                 </div>
 
@@ -952,12 +1046,12 @@ export default function App() {
               
               {/* Selected Filing Context Banner */}
               {selectedFiling && (
-                <div className="bg-[#121417] border border-blue-900/40 rounded-lg p-2.5 flex items-center justify-between text-xs">
+                <div className="bg-blue-50/80 dark:bg-[#121417] border border-blue-200 dark:border-blue-900/40 rounded-lg p-2.5 flex items-center justify-between text-xs">
                   <div className="flex items-center space-x-2">
-                    <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></span>
-                    <span className="text-[#8B949E]">Viewing Filing:</span>
-                    <span className="text-white font-semibold">{selectedFiling.period}</span>
-                    <span className="text-[#8B949E] hidden sm:inline truncate max-w-[180px]">({selectedFiling.title})</span>
+                    <span className="w-2 h-2 rounded-full bg-blue-500 dark:bg-blue-400 animate-pulse"></span>
+                    <span className="text-slate-500 dark:text-[#8B949E]">Viewing Filing:</span>
+                    <span className="text-slate-900 dark:text-white font-semibold">{selectedFiling.period}</span>
+                    <span className="text-slate-500 dark:text-[#8B949E] hidden sm:inline truncate max-w-[180px]">({selectedFiling.title})</span>
                   </div>
                   <button
                     disabled={chatLoading}
@@ -970,10 +1064,10 @@ export default function App() {
                         data?.stock?.code || activeCode
                       );
                     }}
-                    className="text-[11px] text-blue-400 hover:text-white font-medium flex items-center space-x-1 shrink-0 ml-2 disabled:opacity-50"
+                    className="text-[11px] text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-white font-medium flex items-center space-x-1 shrink-0 ml-2 disabled:opacity-50"
                   >
                     {chatLoading ? (
-                      <RefreshCw className="w-3 h-3 animate-spin text-blue-400" />
+                      <RefreshCw className="w-3 h-3 animate-spin text-blue-500 dark:text-blue-400" />
                     ) : (
                       <ArrowRight className="w-3 h-3" />
                     )}
@@ -983,23 +1077,23 @@ export default function App() {
               )}
               
               {/* 1. Price Area Chart */}
-              <div className="bg-[#121417] border border-[#1F2328] rounded-lg p-3 sm:p-4 space-y-2">
-                <div className="flex items-center justify-between border-b border-[#1F2328] pb-2">
+              <div className="bg-white dark:bg-[#121417] border border-slate-200 dark:border-[#1F2328] rounded-lg p-3 sm:p-4 space-y-2">
+                <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#1F2328] pb-2">
                   <div className="flex items-center space-x-2">
-                    <LineChart className="w-4 h-4 text-blue-400" />
-                    <span className="font-semibold text-xs text-white">Price History (MYR)</span>
+                    <LineChart className="w-4 h-4 text-blue-500 dark:text-blue-400" />
+                    <span className="font-semibold text-xs text-slate-900 dark:text-white">Price History (MYR)</span>
                   </div>
 
                   {/* Interval Selector */}
-                  <div className="flex items-center space-x-1 bg-[#090A0C] border border-[#1F2328] p-0.5 rounded text-xs">
+                  <div className="flex items-center space-x-1 bg-slate-100 dark:bg-[#090A0C] border border-slate-200 dark:border-[#1F2328] p-0.5 rounded text-xs">
                     {(["1D", "5D", "1M", "6M", "1Y"] as const).map((interval) => (
                       <button
                         key={interval}
                         onClick={() => setSelectedInterval(interval)}
                         className={`px-2 py-0.5 rounded font-medium transition ${
                           selectedInterval === interval
-                            ? "bg-blue-600 text-white"
-                            : "text-[#8B949E] hover:text-white"
+                            ? "bg-blue-600 text-white shadow-sm"
+                            : "text-slate-600 dark:text-[#8B949E] hover:text-slate-900 dark:hover:text-white"
                         }`}
                       >
                         {interval}
@@ -1011,23 +1105,24 @@ export default function App() {
                 <div className="h-44 sm:h-52 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#1F2328" />
-                      <XAxis dataKey="time" stroke="#8B949E" tick={{ fontSize: 10 }} />
-                      <YAxis domain={["auto", "auto"]} stroke="#8B949E" tick={{ fontSize: 10 }} />
+                      <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#1F2328" : "#E2E8F0"} />
+                      <XAxis dataKey="time" stroke={isDark ? "#8B949E" : "#64748B"} tick={{ fontSize: 10 }} />
+                      <YAxis domain={["auto", "auto"]} stroke={isDark ? "#8B949E" : "#64748B"} tick={{ fontSize: 10 }} />
                       <Tooltip
                         contentStyle={{
-                          backgroundColor: "#121417",
-                          borderColor: "#1F2328",
+                          backgroundColor: isDark ? "#121417" : "#FFFFFF",
+                          borderColor: isDark ? "#1F2328" : "#E2E8F0",
                           borderRadius: "4px",
                           fontSize: "11px",
-                          color: "#F0F3F6"
+                          color: isDark ? "#F0F3F6" : "#0F172A",
+                          boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)"
                         }}
                         formatter={(value: any) => [`RM ${Number(value).toFixed(2)}`, "Price"]}
                       />
                       <Area
                         type="monotone"
                         dataKey="price"
-                        stroke="#38BDF8"
+                        stroke={isDark ? "#38BDF8" : "#2563EB"}
                         strokeWidth={1.5}
                         fill="transparent"
                         isAnimationActive={false}
@@ -1038,13 +1133,13 @@ export default function App() {
               </div>
 
               {/* 2. Topline Revenue vs. Net Profit Progression */}
-              <div className="bg-[#121417] border border-[#1F2328] rounded-lg p-3 sm:p-4 space-y-2">
-                <div className="flex items-center justify-between border-b border-[#1F2328] pb-2">
+              <div className="bg-white dark:bg-[#121417] border border-slate-200 dark:border-[#1F2328] rounded-lg p-3 sm:p-4 space-y-2">
+                <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#1F2328] pb-2">
                   <div className="flex items-center space-x-2">
-                    <BarChart2 className="w-4 h-4 text-emerald-400" />
-                    <span className="font-semibold text-xs text-white">Quarterly Revenue vs. Profit (RM &apos;M)</span>
+                    <BarChart2 className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
+                    <span className="font-semibold text-xs text-slate-900 dark:text-white">Quarterly Revenue vs. Profit (RM &apos;M)</span>
                   </div>
-                  <span className="text-[11px] text-[#8B949E]">Historical Progression</span>
+                  <span className="text-[11px] text-slate-500 dark:text-[#8B949E]">Historical Progression</span>
                 </div>
 
                 <div className="h-32 sm:h-36 w-full">
@@ -1060,16 +1155,17 @@ export default function App() {
                       margin={{ top: 5, right: 5, left: -25, bottom: 0 }}
                       barGap={4}
                     >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#1F2328" />
-                      <XAxis dataKey="quarter" stroke="#8B949E" tick={{ fontSize: 10 }} />
-                      <YAxis stroke="#8B949E" tick={{ fontSize: 10 }} />
+                      <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#1F2328" : "#E2E8F0"} />
+                      <XAxis dataKey="quarter" stroke={isDark ? "#8B949E" : "#64748B"} tick={{ fontSize: 10 }} />
+                      <YAxis stroke={isDark ? "#8B949E" : "#64748B"} tick={{ fontSize: 10 }} />
                       <Tooltip
                         contentStyle={{
-                          backgroundColor: "#121417",
-                          borderColor: "#1F2328",
+                          backgroundColor: isDark ? "#121417" : "#FFFFFF",
+                          borderColor: isDark ? "#1F2328" : "#E2E8F0",
                           borderRadius: "4px",
                           fontSize: "11px",
-                          color: "#F0F3F6"
+                          color: isDark ? "#F0F3F6" : "#0F172A",
+                          boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)"
                         }}
                         formatter={(value: any, name: any) => [
                           `RM ${Number(value).toLocaleString()} M`,
@@ -1077,23 +1173,23 @@ export default function App() {
                         ]}
                       />
                       <Legend wrapperStyle={{ fontSize: "11px" }} />
-                      <Bar dataKey="revenue" name="Revenue" fill="#64748B" barSize={14} radius={[2, 2, 0, 0]} isAnimationActive={false} />
-                      <Bar dataKey="profit" name="Net Profit" fill="#10B981" barSize={14} radius={[2, 2, 0, 0]} isAnimationActive={false} />
+                      <Bar dataKey="revenue" name="Revenue" fill={isDark ? "#64748B" : "#94A3B8"} barSize={14} radius={[2, 2, 0, 0]} isAnimationActive={false} />
+                      <Bar dataKey="profit" name="Net Profit" fill={isDark ? "#10B981" : "#059669"} barSize={14} radius={[2, 2, 0, 0]} isAnimationActive={false} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               </div>
 
               {/* 3. Financial Statement Excerpt Table */}
-              <div className="bg-[#121417] border border-[#1F2328] rounded-lg p-3 sm:p-4 space-y-2">
-                <div className="flex items-center justify-between border-b border-[#1F2328] pb-2">
-                  <span className="font-semibold text-xs text-white">Financial Statement Summary</span>
-                  <span className="text-[11px] text-[#8B949E]">RM &apos;000</span>
+              <div className="bg-white dark:bg-[#121417] border border-slate-200 dark:border-[#1F2328] rounded-lg p-3 sm:p-4 space-y-2">
+                <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#1F2328] pb-2">
+                  <span className="font-semibold text-xs text-slate-900 dark:text-white">Financial Statement Summary</span>
+                  <span className="text-[11px] text-slate-500 dark:text-[#8B949E]">RM &apos;000</span>
                 </div>
 
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs table-zebra">
-                    <thead className="bg-[#090A0C] text-[#8B949E] text-[11px] uppercase border-b border-[#1F2328]">
+                    <thead className="bg-slate-50 dark:bg-[#090A0C] text-slate-500 dark:text-[#8B949E] text-[11px] uppercase border-b border-slate-200 dark:border-[#1F2328]">
                       <tr>
                         <th className="py-1.5 px-2.5 font-medium">Line Item</th>
                         <th className="py-1.5 px-2.5 text-right font-medium">Current Qtr</th>
@@ -1101,60 +1197,60 @@ export default function App() {
                         <th className="py-1.5 px-2.5 text-right font-medium">QoQ Change</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[#1F2328]">
+                    <tbody className="divide-y divide-slate-200 dark:divide-[#1F2328]">
                       <tr>
-                        <td className="py-1.5 px-2.5 text-white font-medium">Revenue</td>
-                        <td className="py-1.5 px-2.5 text-right tabular-nums text-white">
+                        <td className="py-1.5 px-2.5 text-slate-900 dark:text-white font-medium">Revenue</td>
+                        <td className="py-1.5 px-2.5 text-right tabular-nums text-slate-900 dark:text-white">
                           {(data.financial_statement?.revenue || 7200000).toLocaleString()}
                         </td>
-                        <td className="py-1.5 px-2.5 text-right tabular-nums text-[#8B949E]">
+                        <td className="py-1.5 px-2.5 text-right tabular-nums text-slate-500 dark:text-[#8B949E]">
                           {(data.financial_statement?.prev_revenue || 6800000).toLocaleString()}
                         </td>
-                        <td className="py-1.5 px-2.5 text-right tabular-nums font-semibold text-emerald-400">
+                        <td className="py-1.5 px-2.5 text-right tabular-nums font-semibold text-emerald-600 dark:text-emerald-400">
                           {data.metrics?.rev_growth_qoq >= 0 ? "+" : ""}{data.metrics?.rev_growth_qoq}%
                         </td>
                       </tr>
                       <tr>
-                        <td className="py-1.5 px-2.5 text-white font-medium">Net Profit (PATAMI)</td>
-                        <td className="py-1.5 px-2.5 text-right tabular-nums text-white font-bold">
+                        <td className="py-1.5 px-2.5 text-slate-900 dark:text-white font-medium">Net Profit (PATAMI)</td>
+                        <td className="py-1.5 px-2.5 text-right tabular-nums text-slate-900 dark:text-white font-bold">
                           {(data.financial_statement?.net_profit || 2350000).toLocaleString()}
                         </td>
-                        <td className="py-1.5 px-2.5 text-right tabular-nums text-[#8B949E]">
+                        <td className="py-1.5 px-2.5 text-right tabular-nums text-slate-500 dark:text-[#8B949E]">
                           {(data.financial_statement?.prev_net_profit || 2200000).toLocaleString()}
                         </td>
-                        <td className="py-1.5 px-2.5 text-right tabular-nums font-semibold text-emerald-400">
+                        <td className="py-1.5 px-2.5 text-right tabular-nums font-semibold text-emerald-600 dark:text-emerald-400">
                           {data.metrics?.profit_growth_qoq >= 0 ? "+" : ""}{data.metrics?.profit_growth_qoq}%
                         </td>
                       </tr>
                       <tr>
-                        <td className="py-1.5 px-2.5 text-white font-medium">Total Borrowings</td>
-                        <td className="py-1.5 px-2.5 text-right tabular-nums text-white">
+                        <td className="py-1.5 px-2.5 text-slate-900 dark:text-white font-medium">Total Borrowings</td>
+                        <td className="py-1.5 px-2.5 text-right tabular-nums text-slate-900 dark:text-white">
                           {(data.financial_statement?.total_borrowings || 45000000).toLocaleString()}
                         </td>
-                        <td className="py-1.5 px-2.5 text-right tabular-nums text-[#8B949E]">
+                        <td className="py-1.5 px-2.5 text-right tabular-nums text-slate-500 dark:text-[#8B949E]">
                           {((data.financial_statement?.total_borrowings || 45000000) * 0.98).toLocaleString()}
                         </td>
-                        <td className="py-1.5 px-2.5 text-right tabular-nums text-[#8B949E]">+2.04%</td>
+                        <td className="py-1.5 px-2.5 text-right tabular-nums text-slate-500 dark:text-[#8B949E]">+2.04%</td>
                       </tr>
                       <tr>
-                        <td className="py-1.5 px-2.5 text-white font-medium">Cash & Bank Balances</td>
-                        <td className="py-1.5 px-2.5 text-right tabular-nums text-emerald-400 font-bold">
+                        <td className="py-1.5 px-2.5 text-slate-900 dark:text-white font-medium">Cash & Bank Balances</td>
+                        <td className="py-1.5 px-2.5 text-right tabular-nums text-emerald-600 dark:text-emerald-400 font-bold">
                           {(data.financial_statement?.cash || 60000000).toLocaleString()}
                         </td>
-                        <td className="py-1.5 px-2.5 text-right tabular-nums text-[#8B949E]">
+                        <td className="py-1.5 px-2.5 text-right tabular-nums text-slate-500 dark:text-[#8B949E]">
                           {((data.financial_statement?.cash || 60000000) * 0.97).toLocaleString()}
                         </td>
-                        <td className="py-1.5 px-2.5 text-right tabular-nums text-emerald-400 font-semibold">+3.09%</td>
+                        <td className="py-1.5 px-2.5 text-right tabular-nums text-emerald-600 dark:text-emerald-400 font-semibold">+3.09%</td>
                       </tr>
                       <tr>
-                        <td className="py-1.5 px-2.5 text-white font-medium">Basic EPS (sen)</td>
-                        <td className="py-1.5 px-2.5 text-right tabular-nums text-white font-bold">
+                        <td className="py-1.5 px-2.5 text-slate-900 dark:text-white font-medium">Basic EPS (sen)</td>
+                        <td className="py-1.5 px-2.5 text-right tabular-nums text-slate-900 dark:text-white font-bold">
                           {(data.financial_statement?.eps_sen || 19.5).toFixed(2)}
                         </td>
-                        <td className="py-1.5 px-2.5 text-right tabular-nums text-[#8B949E]">
+                        <td className="py-1.5 px-2.5 text-right tabular-nums text-slate-500 dark:text-[#8B949E]">
                           {((data.financial_statement?.eps_sen || 19.5) * 0.94).toFixed(2)}
                         </td>
-                        <td className="py-1.5 px-2.5 text-right tabular-nums text-emerald-400 font-semibold">+6.38%</td>
+                        <td className="py-1.5 px-2.5 text-right tabular-nums text-emerald-600 dark:text-emerald-400 font-semibold">+6.38%</td>
                       </tr>
                     </tbody>
                   </table>
@@ -1162,51 +1258,51 @@ export default function App() {
               </div>
 
               {/* 4. DCF Valuation Scenarios */}
-              <div className="bg-[#121417] border border-[#1F2328] rounded-lg p-3 sm:p-4 space-y-2">
-                <div className="flex items-center justify-between border-b border-[#1F2328] pb-1.5">
+              <div className="bg-white dark:bg-[#121417] border border-slate-200 dark:border-[#1F2328] rounded-lg p-3 sm:p-4 space-y-2">
+                <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#1F2328] pb-1.5">
                   <div className="flex items-center space-x-2">
-                    <Calculator className="w-4 h-4 text-blue-400" />
-                    <span className="font-semibold text-xs text-white">5-Year DCF Valuation Scenarios</span>
+                    <Calculator className="w-4 h-4 text-blue-500 dark:text-blue-400" />
+                    <span className="font-semibold text-xs text-slate-900 dark:text-white">5-Year DCF Valuation Scenarios</span>
                   </div>
-                  <span className="text-[11px] text-[#8B949E]">Sensitivity Analysis</span>
+                  <span className="text-[11px] text-slate-500 dark:text-[#8B949E]">Sensitivity Analysis</span>
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                  <div className="bg-[#090A0C] p-2 rounded border border-[#1F2328]">
-                    <span className="text-[11px] text-[#8B949E] block mb-0.5">Conservative</span>
-                    <span className="font-bold text-white text-xs sm:text-sm tabular-nums">RM {(data.stock.price * 1.05).toFixed(2)}</span>
-                    <span className="text-[10px] text-[#8B949E] block mt-0.5">WACC: 10.0%</span>
+                  <div className="bg-slate-50 dark:bg-[#090A0C] p-2 rounded border border-slate-200 dark:border-[#1F2328]">
+                    <span className="text-[11px] text-slate-500 dark:text-[#8B949E] block mb-0.5">Conservative</span>
+                    <span className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm tabular-nums">RM {(data.stock.price * 1.05).toFixed(2)}</span>
+                    <span className="text-[10px] text-slate-500 dark:text-[#8B949E] block mt-0.5">WACC: 10.0%</span>
                   </div>
-                  <div className="bg-blue-950/20 p-2 rounded border border-blue-800/40">
-                    <span className="text-[11px] text-blue-400 block font-semibold mb-0.5">Base Case</span>
-                    <span className="font-bold text-blue-300 text-xs sm:text-sm tabular-nums">RM {(data.stock.price * 1.25).toFixed(2)}</span>
-                    <span className="text-[10px] text-blue-400/80 block mt-0.5">WACC: 8.5%</span>
+                  <div className="bg-blue-50/70 dark:bg-blue-950/20 p-2 rounded border border-blue-200 dark:border-blue-800/40">
+                    <span className="text-[11px] text-blue-600 dark:text-blue-400 block font-semibold mb-0.5">Base Case</span>
+                    <span className="font-bold text-blue-700 dark:text-blue-300 text-xs sm:text-sm tabular-nums">RM {(data.stock.price * 1.25).toFixed(2)}</span>
+                    <span className="text-[10px] text-blue-600/80 dark:text-blue-400/80 block mt-0.5">WACC: 8.5%</span>
                   </div>
-                  <div className="bg-[#090A0C] p-2 rounded border border-[#1F2328]">
-                    <span className="text-[11px] text-emerald-400 block mb-0.5">Optimistic</span>
-                    <span className="font-bold text-emerald-400 text-xs sm:text-sm tabular-nums">RM {(data.stock.price * 1.48).toFixed(2)}</span>
-                    <span className="text-[10px] text-[#8B949E] block mt-0.5">WACC: 7.0%</span>
+                  <div className="bg-slate-50 dark:bg-[#090A0C] p-2 rounded border border-slate-200 dark:border-[#1F2328]">
+                    <span className="text-[11px] text-emerald-600 dark:text-emerald-400 block mb-0.5">Optimistic</span>
+                    <span className="font-bold text-emerald-600 dark:text-emerald-400 text-xs sm:text-sm tabular-nums">RM {(data.stock.price * 1.48).toFixed(2)}</span>
+                    <span className="text-[10px] text-slate-500 dark:text-[#8B949E] block mt-0.5">WACC: 7.0%</span>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* 3. RIGHT COLUMN: AI Financial Research Copilot */}
-            <div className={`lg:col-span-4 flex flex-col bg-[#121417] border ${
+            <div className={`lg:col-span-4 flex flex-col bg-white dark:bg-[#121417] border ${
               highlightCopilot
                 ? "border-blue-500 ring-2 ring-blue-500/50 shadow-lg shadow-blue-500/10"
-                : "border-[#1F2328]"
+                : "border-slate-200 dark:border-[#1F2328]"
             } rounded-lg h-[540px] sm:h-[620px] lg:h-[760px] transition-all duration-300 ${activeTab === "chat" ? "block" : "hidden lg:flex"}`}>
               
               {/* Copilot Header */}
-              <div className="p-3 bg-[#16191D] border-b border-[#1F2328] flex items-center justify-between">
+              <div className="p-3 bg-slate-50 dark:bg-[#16191D] border-b border-slate-200 dark:border-[#1F2328] flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <div className="w-6 h-6 rounded-full bg-blue-600/20 text-blue-400 flex items-center justify-center">
+                  <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-600/20 text-blue-600 dark:text-blue-400 flex items-center justify-center">
                     <Sparkles className="w-3.5 h-3.5" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-xs text-white">AI Research Copilot</h3>
-                    <p className="text-[10px] text-[#8B949E]">
+                    <h3 className="font-bold text-xs text-slate-900 dark:text-white">AI Research Copilot</h3>
+                    <p className="text-[10px] text-slate-500 dark:text-[#8B949E]">
                       {data.stock.name} • {selectedFiling ? selectedFiling.period : "Latest Filing"}
                     </p>
                   </div>
@@ -1222,7 +1318,7 @@ export default function App() {
                       }
                     ]);
                   }}
-                  className="text-[11px] text-[#8B949E] hover:text-white px-2 py-1 rounded hover:bg-[#1F2328] border border-transparent hover:border-[#30363D] transition"
+                  className="text-[11px] text-slate-500 dark:text-[#8B949E] hover:text-slate-900 dark:hover:text-white px-2 py-1 rounded hover:bg-slate-100 dark:hover:bg-[#1F2328] border border-transparent hover:border-slate-200 dark:hover:border-[#30363D] transition"
                   title="Clear conversation"
                 >
                   Clear Chat
@@ -1230,14 +1326,14 @@ export default function App() {
               </div>
 
               {/* Suggested Questions Pills */}
-              <div className="px-3 py-2 bg-[#121417] border-b border-[#1F2328] flex items-center space-x-1.5 overflow-x-auto text-xs whitespace-nowrap">
-                <span className="text-[11px] text-[#8B949E] shrink-0 mr-1">Suggestions:</span>
+              <div className="px-3 py-2 bg-slate-50/60 dark:bg-[#121417] border-b border-slate-200 dark:border-[#1F2328] flex items-center space-x-1.5 overflow-x-auto text-xs whitespace-nowrap">
+                <span className="text-[11px] text-slate-500 dark:text-[#8B949E] shrink-0 mr-1">Suggestions:</span>
                 {SUGGESTED_QUESTIONS.map((q, idx) => (
                   <button
                     key={idx}
                     onClick={() => handleSendMessage(q.prompt)}
                     disabled={chatLoading}
-                    className="bg-[#16191D] hover:bg-[#1F2328] text-[#8B949E] hover:text-white text-[11px] px-2 py-0.5 rounded border border-[#1F2328] transition shrink-0 disabled:opacity-40"
+                    className="bg-white dark:bg-[#16191D] hover:bg-slate-100 dark:hover:bg-[#1F2328] text-slate-600 dark:text-[#8B949E] hover:text-slate-900 dark:hover:text-white text-[11px] px-2 py-0.5 rounded border border-slate-200 dark:border-[#1F2328] transition shrink-0 disabled:opacity-40"
                   >
                     {q.label}
                   </button>
@@ -1249,31 +1345,31 @@ export default function App() {
                 {chatMessages.map((msg, index) => (
                   <div key={index} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
                     
-                    <div className="flex items-center space-x-1.5 mb-1 text-[10px] text-[#8B949E]">
+                    <div className="flex items-center space-x-1.5 mb-1 text-[10px] text-slate-500 dark:text-[#8B949E]">
                       <span>{msg.role === "user" ? "You" : "Analyst Copilot"}</span>
                       {msg.time && <span>• {msg.time}</span>}
                     </div>
 
                     <div className={`p-3 rounded-lg max-w-[92%] leading-relaxed ${
                       msg.role === "user"
-                        ? "bg-blue-600 text-white rounded-tr-none"
-                        : "bg-[#16191D] text-slate-200 border border-[#1F2328] rounded-tl-none"
+                        ? "bg-blue-600 text-white rounded-tr-none shadow-sm"
+                        : "bg-slate-100 dark:bg-[#16191D] text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-[#1F2328] rounded-tl-none"
                     }`}>
                       {msg.role === "user" ? (
                         <p className="whitespace-pre-wrap">{msg.content}</p>
                       ) : (
-                        <div className="prose prose-invert prose-xs max-w-none space-y-1.5 text-slate-200">
+                        <div className="prose dark:prose-invert prose-xs max-w-none space-y-1.5 text-slate-800 dark:text-slate-200">
                           <ReactMarkdown
                             components={{
-                              h1: ({ node, ...props }) => <h3 className="text-xs font-bold text-white border-b border-[#1F2328] pb-1 mt-1 mb-1" {...props} />,
-                              h2: ({ node, ...props }) => <h4 className="text-xs font-bold text-white mt-1 mb-0.5" {...props} />,
-                              p: ({ node, ...props }) => <p className="mb-1.5 leading-relaxed text-xs" {...props} />,
+                              h1: ({ node, ...props }) => <h3 className="text-xs font-bold text-slate-900 dark:text-white border-b border-slate-200 dark:border-[#1F2328] pb-1 mt-1 mb-1" {...props} />,
+                              h2: ({ node, ...props }) => <h4 className="text-xs font-bold text-slate-900 dark:text-white mt-1 mb-0.5" {...props} />,
+                              p: ({ node, ...props }) => <p className="mb-1.5 leading-relaxed text-xs text-slate-800 dark:text-slate-200" {...props} />,
                               ul: ({ node, ...props }) => <ul className="list-disc pl-4 space-y-0.5 mb-1 text-xs" {...props} />,
                               ol: ({ node, ...props }) => <ol className="list-decimal pl-4 space-y-0.5 mb-1 text-xs" {...props} />,
-                              li: ({ node, ...props }) => <li className="text-slate-200" {...props} />,
-                              strong: ({ node, ...props }) => <strong className="font-bold text-white" {...props} />,
+                              li: ({ node, ...props }) => <li className="text-slate-800 dark:text-slate-200" {...props} />,
+                              strong: ({ node, ...props }) => <strong className="font-bold text-slate-900 dark:text-white" {...props} />,
                               blockquote: ({ node, ...props }) => (
-                                <blockquote className="border-l-2 border-blue-500 pl-2 py-0.5 my-1 bg-[#121417] text-[#8B949E] italic text-[11px]" {...props} />
+                                <blockquote className="border-l-2 border-blue-500 pl-2 py-0.5 my-1 bg-slate-200/50 dark:bg-[#121417] text-slate-600 dark:text-[#8B949E] italic text-[11px]" {...props} />
                               ),
                             }}
                           >
@@ -1287,14 +1383,14 @@ export default function App() {
 
                 {chatLoading && (
                   <div className="flex flex-col items-start">
-                    <div className="text-[10px] text-[#8B949E] mb-1">Analyst Copilot is analyzing filings...</div>
-                    <div className="bg-[#16191D] border border-[#1F2328] rounded-lg rounded-tl-none p-3 flex items-center space-x-2 text-slate-300">
+                    <div className="text-[10px] text-slate-500 dark:text-[#8B949E] mb-1">Analyst Copilot is analyzing filings...</div>
+                    <div className="bg-slate-100 dark:bg-[#16191D] border border-slate-200 dark:border-[#1F2328] rounded-lg rounded-tl-none p-3 flex items-center space-x-2 text-slate-700 dark:text-slate-300">
                       <div className="flex space-x-1">
-                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce"></div>
-                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
-                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+                        <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce"></div>
+                        <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+                        <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:0.4s]"></div>
                       </div>
-                      <span className="text-[11px] text-[#8B949E]">Reviewing quarterly disclosures...</span>
+                      <span className="text-[11px] text-slate-500 dark:text-[#8B949E]">Reviewing quarterly disclosures...</span>
                     </div>
                   </div>
                 )}
@@ -1302,7 +1398,7 @@ export default function App() {
               </div>
 
               {/* Chat Input Bar */}
-              <div className="p-3 bg-[#121417] border-t border-[#1F2328]">
+              <div className="p-3 bg-slate-50 dark:bg-[#121417] border-t border-slate-200 dark:border-[#1F2328]">
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
@@ -1315,7 +1411,7 @@ export default function App() {
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
                     placeholder={`Ask about ${data.stock.name} revenue, debt, or prospects...`}
-                    className="flex-1 bg-[#090A0C] border border-[#1F2328] rounded px-3 py-2 text-xs text-white placeholder:text-[#6E7681] focus:outline-none focus:border-blue-500 transition"
+                    className="flex-1 bg-white dark:bg-[#090A0C] border border-slate-200 dark:border-[#1F2328] rounded px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-[#6E7681] focus:outline-none focus:border-blue-500 transition"
                   />
                   <button
                     type="submit"
@@ -1326,7 +1422,7 @@ export default function App() {
                     <Send className="w-4 h-4" />
                   </button>
                 </form>
-                <p className="text-[10px] text-[#8B949E] text-center mt-1.5">
+                <p className="text-[10px] text-slate-500 dark:text-[#8B949E] text-center mt-1.5">
                   AI insights grounded in official quarterly reports
                 </p>
               </div>
@@ -1342,81 +1438,81 @@ export default function App() {
       {/* Shows animated step-by-step progress without any implementation jargon    */}
       {/* ========================================================================= */}
       {loading && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#12161f] border border-slate-700/80 rounded-2xl max-w-md w-full p-6 text-center shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#12161f] border border-slate-200 dark:border-slate-700/80 rounded-2xl max-w-md w-full p-6 text-center shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
             
             {/* Animated Loading Rings & Document Icon */}
             <div className="relative w-16 h-16 mx-auto">
               <div className="absolute inset-0 rounded-full border-2 border-blue-500/20 border-t-blue-500 animate-spin"></div>
               <div className="absolute inset-2 rounded-full border-2 border-emerald-500/20 border-b-emerald-500 animate-spin [animation-duration:1.5s]"></div>
-              <div className="absolute inset-0 flex items-center justify-center text-blue-400">
+              <div className="absolute inset-0 flex items-center justify-center text-blue-500 dark:text-blue-400">
                 <FileText className="w-6 h-6 animate-pulse" />
               </div>
             </div>
 
             {/* Title & Subtitle */}
             <div className="space-y-1">
-              <h3 className="text-base font-bold text-white">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">
                 Analyzing {loadingStockName || "Company Reports"}...
               </h3>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 Pulling official quarterly disclosures and generating insights
               </p>
             </div>
 
             {/* Multi-Step Ingestion Checklist (Zero tech jargon) */}
-            <div className="bg-[#090c14] border border-slate-800 rounded-xl p-3.5 text-left text-xs space-y-2.5 font-sans">
+            <div className="bg-slate-50 dark:bg-[#090c14] border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 text-left text-xs space-y-2.5 font-sans">
               <div className="flex items-center space-x-2.5">
                 {loadingStep > 1 ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                 ) : (
-                  <RefreshCw className="w-4 h-4 text-blue-400 animate-spin shrink-0" />
+                  <RefreshCw className="w-4 h-4 text-blue-500 dark:text-blue-400 animate-spin shrink-0" />
                 )}
-                <span className={loadingStep >= 1 ? "text-slate-200 font-medium" : "text-slate-500"}>
+                <span className={loadingStep >= 1 ? "text-slate-800 dark:text-slate-200 font-medium" : "text-slate-400 dark:text-slate-500"}>
                   1. Retrieving quarterly financial statements & balance sheets
                 </span>
               </div>
 
               <div className="flex items-center space-x-2.5">
                 {loadingStep > 2 ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                 ) : loadingStep === 2 ? (
-                  <RefreshCw className="w-4 h-4 text-blue-400 animate-spin shrink-0" />
+                  <RefreshCw className="w-4 h-4 text-blue-500 dark:text-blue-400 animate-spin shrink-0" />
                 ) : (
-                  <div className="w-4 h-4 rounded-full border border-slate-700 shrink-0" />
+                  <div className="w-4 h-4 rounded-full border border-slate-300 dark:border-slate-700 shrink-0" />
                 )}
-                <span className={loadingStep >= 2 ? "text-slate-200 font-medium" : "text-slate-500"}>
+                <span className={loadingStep >= 2 ? "text-slate-800 dark:text-slate-200 font-medium" : "text-slate-400 dark:text-slate-500"}>
                   2. Extracting financial tables & explanatory notes
                 </span>
               </div>
 
               <div className="flex items-center space-x-2.5">
                 {loadingStep > 3 ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                 ) : loadingStep === 3 ? (
-                  <RefreshCw className="w-4 h-4 text-blue-400 animate-spin shrink-0" />
+                  <RefreshCw className="w-4 h-4 text-blue-500 dark:text-blue-400 animate-spin shrink-0" />
                 ) : (
-                  <div className="w-4 h-4 rounded-full border border-slate-700 shrink-0" />
+                  <div className="w-4 h-4 rounded-full border border-slate-300 dark:border-slate-700 shrink-0" />
                 )}
-                <span className={loadingStep >= 3 ? "text-slate-200 font-medium" : "text-slate-500"}>
+                <span className={loadingStep >= 3 ? "text-slate-800 dark:text-slate-200 font-medium" : "text-slate-400 dark:text-slate-500"}>
                   3. Analyzing revenue drivers & profit margins
                 </span>
               </div>
 
               <div className="flex items-center space-x-2.5">
                 {loadingStep >= 4 ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                 ) : (
-                  <div className="w-4 h-4 rounded-full border border-slate-700 shrink-0" />
+                  <div className="w-4 h-4 rounded-full border border-slate-300 dark:border-slate-700 shrink-0" />
                 )}
-                <span className={loadingStep >= 4 ? "text-emerald-400 font-medium" : "text-slate-500"}>
+                <span className={loadingStep >= 4 ? "text-emerald-600 dark:text-emerald-400 font-medium" : "text-slate-400 dark:text-slate-500"}>
                   4. Preparing research overview & copilot
                 </span>
               </div>
             </div>
 
             {/* Smooth Animated Progress Bar */}
-            <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+            <div className="w-full bg-slate-200 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
               <div
                 className="bg-gradient-to-r from-blue-500 to-emerald-500 h-full transition-all duration-300"
                 style={{ width: `${Math.min(loadingStep * 25, 100)}%` }}
@@ -1428,7 +1524,7 @@ export default function App() {
       )}
 
       {/* 5. Clean Minimal Footer */}
-      <footer className="bg-[#121417] border-t border-[#1F2328] py-3 px-4 text-xs text-[#8B949E]">
+      <footer className="bg-white dark:bg-[#121417] border-t border-slate-200 dark:border-[#1F2328] py-3 px-4 text-xs text-slate-500 dark:text-[#8B949E]">
         <div className="w-full max-w-[1600px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-1 text-[11px]">
           <p>© 2026 Bursa Intelligence. Public market data and financial disclosures.</p>
           <p>For educational & research purposes only.</p>
