@@ -7,26 +7,27 @@ import {
   TrendingDown,
   BarChart2,
   LineChart,
-  CornerDownLeft,
-  Terminal as TerminalIcon,
+  Send,
+  MessageSquare,
+  Sparkles,
   X,
   FileText,
   Upload,
   FileUp,
   Database,
-  Trash2,
   ArrowLeft,
   ChevronRight,
   ShieldCheck,
-  Cpu,
-  Sliders,
   Calculator,
   RefreshCw,
   CheckCircle2,
   AlertCircle,
-  Sparkles,
-  Bot,
-  ArrowRight,
+  HelpCircle,
+  ArrowUpRight,
+  ArrowDownRight,
+  CornerDownLeft,
+  Building2,
+  Layers,
   Check
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
@@ -47,14 +48,14 @@ const API_BASE = "http://localhost:8008";
 
 // Curated Bursa Equities
 const POPULAR_COMPANIES = [
-  { code: "1155", ticker: "1155.KL", name: "Maybank", sector: "Financial Services", price: 10.12, change: -0.39, positive: false },
-  { code: "5347", ticker: "5347.KL", name: "Tenaga Nasional", sector: "Utilities & Power", price: 13.04, change: 1.46, positive: true },
+  { code: "1155", ticker: "1155.KL", name: "Maybank", sector: "Banking & Finance", price: 10.12, change: -0.39, positive: false },
+  { code: "5347", ticker: "5347.KL", name: "Tenaga Nasional", sector: "Utilities & Energy", price: 13.04, change: 1.46, positive: true },
   { code: "1023", ticker: "1023.KL", name: "CIMB Group", sector: "Banking & Wealth", price: 8.24, change: 0.85, positive: true },
   { code: "5296", ticker: "5296.KL", name: "MR D.I.Y.", sector: "Consumer Retail", price: 1.17, change: 0.51, positive: true },
   { code: "1295", ticker: "1295.KL", name: "Public Bank", sector: "Commercial Banking", price: 4.52, change: -0.22, positive: false },
-  { code: "7113", ticker: "7113.KL", name: "Top Glove", sector: "Healthcare & Mfg", price: 1.14, change: 3.64, positive: true },
-  { code: "5183", ticker: "5183.KL", name: "PETRONAS Chem", sector: "Commodities & Energy", price: 5.48, change: -1.26, positive: false },
-  { code: "6742", ticker: "6742.KL", name: "YTL Power", sector: "Infrastructure & DC", price: 3.62, change: 1.68, positive: true },
+  { code: "7113", ticker: "7113.KL", name: "Top Glove", sector: "Healthcare & Rubber", price: 1.14, change: 3.64, positive: true },
+  { code: "5183", ticker: "5183.KL", name: "PETRONAS Chem", sector: "Chemicals & Gas", price: 5.48, change: -1.26, positive: false },
+  { code: "6742", ticker: "6742.KL", name: "YTL Power", sector: "Data Centers & Infrastructure", price: 3.62, change: 1.68, positive: true },
 ];
 
 const CHART_INTERVALS: { [key: string]: { time: string; price: number; volume: number }[] } = {
@@ -98,40 +99,40 @@ const CHART_INTERVALS: { [key: string]: { time: string; price: number; volume: n
   ],
 };
 
-const DISCLOSURE_QUERIES = [
-  { label: "B1 Revenue Drivers", prompt: "Summarize the primary revenue drivers and segmental variance disclosed in Note B1." },
-  { label: "B3 Operating Prospects", prompt: "Extract the Board's commentary on market prospects, geopolitical risks, and Capex in Note B3." },
-  { label: "B5 Material Variance", prompt: "Explain the material variance between current quarter pre-tax profit vs. preceding quarter per Note B5." },
-  { label: "Borrowings & Covenants", prompt: "Detail total debt obligations, foreign currency exposure, and debt covenant compliance status." },
-  { label: "DCF & Valuation Rationale", prompt: "What are the key valuation sensitivities, cost of capital, and terminal growth assumptions for this stock?" }
+const SUGGESTED_QUESTIONS = [
+  { label: "Revenue Drivers", prompt: "What are the primary revenue drivers and segmental results in Note B1?" },
+  { label: "Board Outlook", prompt: "Summarize the Board of Directors' prospects and Capex expectations in Note B3." },
+  { label: "Quarterly Variance", prompt: "Explain the pre-tax profit variance between current and preceding quarter per Note B5." },
+  { label: "Debt & Covenants", prompt: "What are the company's total borrowings, gearing ratio, and debt covenants?" },
+  { label: "DCF Valuation", prompt: "What are the fair value estimates and key sensitivity assumptions under DCF?" }
 ];
 
-// Smart Natural Language & Ticker Parser
-function parseNaturalQuery(query: string) {
+// Natural language query parser
+function parseQuery(query: string) {
   if (!query.trim()) return { company: null, instruction: "", raw: "" };
 
   const qLower = query.toLowerCase().trim();
   let matchedCompany: typeof POPULAR_COMPANIES[0] | null = null;
 
   for (const comp of POPULAR_COMPANIES) {
-    const triggers = [
+    const aliases = [
       comp.code,
       comp.ticker.toLowerCase(),
       comp.name.toLowerCase(),
       ...comp.name.toLowerCase().split(" "),
     ].filter(t => t.length > 2);
 
-    if (comp.name.toLowerCase().includes("tenaga")) triggers.push("tnb", "tenaga");
-    if (comp.name.toLowerCase().includes("maybank")) triggers.push("malayan banking", "maybank");
-    if (comp.name.toLowerCase().includes("cimb")) triggers.push("cimb");
-    if (comp.name.toLowerCase().includes("d.i.y")) triggers.push("diy", "mr diy", "mr. diy", "mrdiy");
-    if (comp.name.toLowerCase().includes("public bank")) triggers.push("pbb", "public bank", "public");
-    if (comp.name.toLowerCase().includes("top glove")) triggers.push("top glove", "topglove", "glove");
-    if (comp.name.toLowerCase().includes("petronas chem")) triggers.push("petchem", "petronas", "pcg");
-    if (comp.name.toLowerCase().includes("ytl power")) triggers.push("ytl", "ytl power", "ytlpower");
+    if (comp.name.toLowerCase().includes("tenaga")) aliases.push("tnb", "tenaga");
+    if (comp.name.toLowerCase().includes("maybank")) aliases.push("malayan banking", "maybank");
+    if (comp.name.toLowerCase().includes("cimb")) aliases.push("cimb");
+    if (comp.name.toLowerCase().includes("d.i.y")) aliases.push("diy", "mr diy", "mr. diy", "mrdiy");
+    if (comp.name.toLowerCase().includes("public bank")) aliases.push("pbb", "public bank");
+    if (comp.name.toLowerCase().includes("top glove")) aliases.push("top glove", "topglove", "glove");
+    if (comp.name.toLowerCase().includes("petronas chem")) aliases.push("petchem", "petronas", "pcg");
+    if (comp.name.toLowerCase().includes("ytl power")) aliases.push("ytl", "ytl power", "ytlpower");
 
-    for (const trig of triggers) {
-      const reg = new RegExp(`\\b${trig.replace('.', '\\.')}\\b`, 'i');
+    for (const alias of aliases) {
+      const reg = new RegExp(`\\b${alias.replace('.', '\\.')}\\b`, 'i');
       if (reg.test(qLower)) {
         matchedCompany = comp;
         break;
@@ -140,7 +141,6 @@ function parseNaturalQuery(query: string) {
     if (matchedCompany) break;
   }
 
-  // Fallback to substring match
   if (!matchedCompany) {
     matchedCompany = POPULAR_COMPANIES.find(c =>
       qLower.includes(c.code) ||
@@ -149,7 +149,6 @@ function parseNaturalQuery(query: string) {
     ) || null;
   }
 
-  // Extract remaining instruction
   let instruction = query;
   if (matchedCompany) {
     let clean = query;
@@ -161,9 +160,8 @@ function parseNaturalQuery(query: string) {
     instruction = clean;
   }
 
-  // If user explicitly said "analyze/analyse the financial report", preserve the analytical request
   if (/analy[sz]e/i.test(query) && /financial|report|filing|quarterly/i.test(query)) {
-    instruction = "Please perform a comprehensive forensic analysis of the latest financial report, highlighting topline revenue, PATAMI margins, and Part B notes.";
+    instruction = "Please provide an executive summary and analysis of the latest financial report, highlighting revenue, profit margins, and key notes.";
   }
 
   return {
@@ -173,7 +171,7 @@ function parseNaturalQuery(query: string) {
   };
 }
 
-export default function TerminalPage() {
+export default function App() {
   const [view, setView] = useState<"home" | "terminal">("home");
   const [activeCode, setActiveCode] = useState<string>("1155");
   const [searchQuery, setSearchQuery] = useState("");
@@ -181,23 +179,27 @@ export default function TerminalPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Start Page Interactive Assistant Popup State
-  const [isInputActive, setIsInputActive] = useState(false);
-  const [parsedIntent, setParsedIntent] = useState<ReturnType<typeof parseNaturalQuery>>({ company: null, instruction: "", raw: "" });
+  // User-friendly Start Page Assistant Popup
+  const [isInputFocused, setIsInputFocused] = useState(false);
+  const [parsedIntent, setParsedIntent] = useState<ReturnType<typeof parseQuery>>({ company: null, instruction: "", raw: "" });
   const [assistantDismissed, setAssistantDismissed] = useState(false);
 
+  // Time Interval & Charts
   const [selectedInterval, setSelectedInterval] = useState<string>("1D");
   const [chartData, setChartData] = useState(CHART_INTERVALS["1D"]);
 
+  // Analyst Chat Messages
   const [chatMessages, setChatMessages] = useState<
-    { role: "user" | "assistant" | "system"; content: string; time?: string }[]
+    { role: "user" | "assistant"; content: string; time?: string }[]
   >([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
-  const [mobileTab, setMobileTab] = useState<"dashboard" | "console">("dashboard");
+  // Responsive Workspace View Toggle for mobile
+  const [activeTab, setActiveTab] = useState<"overview" | "chat">("overview");
 
+  // Ingestion Modal State
   const [ingestModalOpen, setIngestModalOpen] = useState(false);
   const [ingestStockCode, setIngestStockCode] = useState("1155");
   const [ingestMode, setIngestMode] = useState<"file" | "text">("file");
@@ -206,10 +208,10 @@ export default function TerminalPage() {
   const [ingestLoading, setIngestLoading] = useState(false);
   const [ingestFeedback, setIngestFeedback] = useState<{ success: boolean; message: string; details?: any } | null>(null);
 
-  // Update real-time intent parsing as user types
+  // Update intent on typing
   useEffect(() => {
     if (searchQuery.trim().length > 0) {
-      const intent = parseNaturalQuery(searchQuery);
+      const intent = parseQuery(searchQuery);
       setParsedIntent(intent);
       setAssistantDismissed(false);
     } else {
@@ -220,7 +222,7 @@ export default function TerminalPage() {
   const loadStockData = async (code: string, autoInstruction?: string) => {
     setLoading(true);
     setError(null);
-    setIsInputActive(false);
+    setIsInputFocused(false);
 
     try {
       const res = await fetch(`${API_BASE}/api/reports/analyze`, {
@@ -248,18 +250,12 @@ export default function TerminalPage() {
 
       setChatMessages([
         {
-          role: "system",
-          content: `SESSION INITIALIZED // SYMBOL: ${json.stock.name.toUpperCase()} (${json.stock.ticker})\n4-STAGE RAG STATUS: AST INDEXED | BM25 + CHROMADB RRF READY | FLASHRANK ONLINE\nREGULATORY JURISDICTION: BURSA MALAYSIA // CMSA 2007 COMPLIANT`,
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
-        },
-        {
           role: "assistant",
-          content: `Quarterly regulatory filing retrieved and indexed for **${json.stock.name} (${json.stock.ticker})**.\n\n- **Current Price:** RM ${json.stock.price.toFixed(2)} (${json.stock.change_pct >= 0 ? "+" : ""}${json.stock.change_pct.toFixed(2)}%)\n- **Operating Revenue:** RM ${(json.financial_statement?.revenue || 7200000).toLocaleString()} ('000)\n- **PATAMI:** RM ${(json.financial_statement?.net_profit || 2350000).toLocaleString()} ('000)\n- **Indexed Disclosures:** Condensed P&L, Balance Sheet, and Part B Notes B1 through B6.`,
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+          content: `Hello! I have loaded and indexed the latest quarterly financial disclosures for **${json.stock.name} (${json.stock.ticker})**.\n\n- **Current Price:** RM ${json.stock.price.toFixed(2)} (${json.stock.change_pct >= 0 ? "+" : ""}${json.stock.change_pct.toFixed(2)}%)\n- **Operating Revenue:** RM ${(json.financial_statement?.revenue || 7200000).toLocaleString()} ('000)\n- **Net Profit:** RM ${(json.financial_statement?.net_profit || 2350000).toLocaleString()} ('000)\n\nFeel free to ask me anything about the company's revenue drivers, balance sheet, or regulatory notes.`,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
       ]);
 
-      // If user had included an instruction in their initial search, execute it immediately in the console!
       if (autoInstruction && autoInstruction.trim().length > 0) {
         setTimeout(() => {
           handleSendMessage(autoInstruction.trim(), code);
@@ -292,13 +288,13 @@ export default function TerminalPage() {
     e.preventDefault();
     if (!searchQuery.trim()) return;
 
-    const parsed = parseNaturalQuery(searchQuery);
+    const parsed = parseQuery(searchQuery);
     const targetCode = parsed.company ? parsed.company.code : (POPULAR_COMPANIES.find(c => c.code === searchQuery.trim())?.code || "1155");
     const instruction = parsed.instruction || "";
 
     loadStockData(targetCode, instruction);
     setSearchQuery("");
-    setIsInputActive(false);
+    setIsInputFocused(false);
   };
 
   const handleSendMessage = async (textToSend?: string, overrideCode?: string) => {
@@ -306,7 +302,7 @@ export default function TerminalPage() {
     if (!query.trim() || chatLoading) return;
 
     const stockToUse = overrideCode || activeCode;
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const userMsg = { role: "user" as const, content: query, time: timeStr };
     setChatMessages((prev) => [...prev, userMsg]);
     if (!textToSend) setChatInput("");
@@ -330,7 +326,7 @@ export default function TerminalPage() {
         {
           role: "assistant",
           content: json.reply,
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         },
       ]);
     } catch (err: any) {
@@ -338,8 +334,8 @@ export default function TerminalPage() {
         ...prev,
         {
           role: "assistant",
-          content: `ERR_BACKEND_COMMUNICATION: ${err.message}. Retrying via deterministic retrieval engine...`,
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+          content: `Unable to complete request: ${err.message}. Please try again shortly.`,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         },
       ]);
     } finally {
@@ -374,7 +370,7 @@ export default function TerminalPage() {
 
       setIngestFeedback({
         success: true,
-        message: json.message || "Report ingested successfully into 4-Stage RAG.",
+        message: json.message || "Filing ingested successfully.",
         details: json
       });
 
@@ -382,9 +378,9 @@ export default function TerminalPage() {
       setChatMessages((prev) => [
         ...prev,
         {
-          role: "system",
-          content: `INGEST_COMMIT // FILE: \`${reportName}\` | SYMBOL: ${json.stock_code}\nINDEXED: ${json.sections_indexed} SECTIONS, ${json.tables_extracted} TABLES\n4-STAGE RAG VECTOR SPACE UPDATED`,
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+          role: "assistant",
+          content: `I've successfully uploaded and indexed **${reportName}** for **${json.stock_code}** (${json.sections_indexed} sections and ${json.tables_extracted} tables extracted). You can now ask questions about this new report!`,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
       ]);
 
@@ -397,7 +393,7 @@ export default function TerminalPage() {
     } catch (err: any) {
       setIngestFeedback({
         success: false,
-        message: err.message || "Failed to ingest report.",
+        message: err.message || "Failed to ingest filing.",
       });
     } finally {
       setIngestLoading(false);
@@ -407,58 +403,59 @@ export default function TerminalPage() {
   const isPositive = (data?.stock?.change_pct || 0) >= 0;
 
   return (
-    <div className="min-h-screen bg-[#090A0C] text-[#F0F3F6] flex flex-col font-sans antialiased selection:bg-[#38BDF8] selection:text-[#090A0C]">
+    <div className="min-h-screen bg-[#090A0C] text-[#F0F3F6] flex flex-col font-sans">
       
-      {/* 1. Global Terminal Header - Fits All Screen Sizes */}
-      <header className="bg-[#121417] border-b border-[#1F2328] sticky top-0 z-40 select-none">
-        <div className="w-full max-w-7xl mx-auto px-3 sm:px-4 py-2 flex items-center justify-between gap-3 text-xs">
+      {/* 1. Global Navigation Bar - Responsive on all screens */}
+      <header className="bg-[#121417] border-b border-[#1F2328] sticky top-0 z-40">
+        <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 py-2.5 flex items-center justify-between gap-3">
           
-          {/* Logo & Terminal Identity */}
+          {/* Logo & Platform Name */}
           <div className="flex items-center space-x-2.5 cursor-pointer shrink-0" onClick={() => setView("home")}>
-            <div className="w-5 h-5 bg-[#1F2328] border border-[#30363D] flex items-center justify-center font-mono font-bold text-[#F0F3F6] text-[11px] rounded-[2px]">
-              B
+            <div className="w-7 h-7 bg-blue-600 rounded flex items-center justify-center font-bold text-white text-xs shadow-sm">
+              BI
             </div>
-            <div className="flex items-center space-x-1.5">
-              <span className="font-mono font-bold tracking-wider text-[12px] text-[#F0F3F6]">BURSA_INTELLIGENCE</span>
-              <span className="text-[10px] font-mono bg-[#16191D] text-[#8B949E] px-1 py-0.2 border border-[#1F2328] rounded-[2px] hidden sm:inline">
-                KLSE
-              </span>
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="font-bold text-sm tracking-tight text-white">Bursa Intelligence</span>
+                <span className="text-[10px] bg-[#16191D] text-[#8B949E] px-1.5 py-0.5 rounded border border-[#1F2328] hidden sm:inline">
+                  Malaysia
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* Quick Command Search Bar (Terminal View) */}
+          {/* Search Bar in Terminal Mode */}
           {view === "terminal" && (
-            <form onSubmit={handleSearchSubmit} className="flex-1 max-w-sm hidden md:flex items-center">
+            <form onSubmit={handleSearchSubmit} className="flex-1 max-w-md hidden md:flex items-center">
               <div className="relative w-full">
-                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#8B949E] font-mono text-[11px] select-none">&gt;</span>
+                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#8B949E]" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Switch stock (e.g. 5347, Tenaga, CIMB, MR DIY)..."
-                  className="w-full bg-[#090A0C] border border-[#1F2328] rounded-[2px] pl-6 pr-14 py-1 text-[11px] font-mono text-[#F0F3F6] placeholder:text-[#6E7681] focus:outline-none focus:border-[#38BDF8]"
+                  placeholder="Switch stock (e.g. Tenaga, Maybank, CIMB, 5347)..."
+                  className="w-full bg-[#090A0C] border border-[#1F2328] rounded pl-8 pr-16 py-1.5 text-xs text-[#F0F3F6] placeholder:text-[#6E7681] focus:outline-none focus:border-[#38BDF8] transition"
                 />
                 <button
                   type="submit"
                   disabled={loading}
-                  className="absolute right-1 top-1/2 -translate-y-1/2 bg-[#16191D] hover:bg-[#1F2328] text-[#8B949E] hover:text-[#F0F3F6] px-1.5 py-0.5 rounded-[2px] text-[10px] font-mono border border-[#1F2328] disabled:opacity-40"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 bg-[#1F2328] hover:bg-[#30363D] text-[#F0F3F6] px-2 py-0.5 rounded text-xs font-medium border border-[#30363D] transition disabled:opacity-40"
                 >
-                  {loading ? "FETCH" : "GO"}
+                  {loading ? "..." : "Go"}
                 </button>
               </div>
             </form>
           )}
 
-          {/* Navigation & Ingestion Controls */}
-          <div className="flex items-center space-x-1.5 font-mono text-[11px]">
+          {/* Action Buttons */}
+          <div className="flex items-center space-x-2 text-xs">
             {view === "terminal" && (
               <button
                 onClick={() => setView("home")}
-                className="bg-[#121417] hover:bg-[#16191D] text-[#8B949E] hover:text-[#F0F3F6] px-2 py-1 rounded-[2px] border border-[#1F2328] flex items-center space-x-1"
-                title="Return to Start Page"
+                className="bg-[#16191D] hover:bg-[#1F2328] text-[#8B949E] hover:text-[#F0F3F6] px-2.5 py-1.5 rounded border border-[#1F2328] flex items-center space-x-1.5 transition font-medium"
               >
-                <ArrowLeft className="w-3 h-3" />
-                <span className="hidden sm:inline">START_PAGE</span>
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Start Page</span>
               </button>
             )}
 
@@ -467,111 +464,105 @@ export default function TerminalPage() {
                 setIngestStockCode(data?.stock?.code || "1155");
                 setIngestModalOpen(true);
               }}
-              className="bg-[#121417] hover:bg-[#16191D] text-[#10B981] px-2.5 py-1 rounded-[2px] border border-[#1F2328] flex items-center space-x-1 font-semibold"
-              title="Upload PDF or Markdown Filing"
+              className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded font-medium flex items-center space-x-1.5 transition"
             >
-              <FileUp className="w-3 h-3" />
-              <span className="hidden sm:inline">[INGEST_FILING]</span>
-              <span className="sm:hidden">INGEST</span>
+              <FileUp className="w-3.5 h-3.5" />
+              <span>Upload Filing</span>
             </button>
           </div>
         </div>
       </header>
 
-      {/* 2. VIEW 1: USER-FRIENDLY RESPONSIVE START PAGE */}
+      {/* 2. VIEW 1: CLEAN, USER-FRIENDLY START PAGE */}
       {view === "home" && (
         <main className="flex-1 w-full max-w-5xl mx-auto px-3 sm:px-6 py-6 sm:py-10 flex flex-col items-center justify-center space-y-6 sm:space-y-8">
           
-          {/* Header Title */}
+          {/* Hero Welcome */}
           <div className="text-center space-y-2 max-w-xl w-full">
-            <div className="inline-flex items-center space-x-1.5 bg-[#121417] border border-[#1F2328] px-2 py-0.5 text-[11px] font-mono text-[#8B949E] rounded-[2px]">
-              <ShieldCheck className="w-3.5 h-3.5 text-[#38BDF8]" />
-              <span>BURSA MALAYSIA FORENSIC TERMINAL</span>
+            <div className="inline-flex items-center space-x-1.5 bg-[#121417] border border-[#1F2328] px-2.5 py-1 text-xs text-[#8B949E] rounded-full">
+              <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+              <span>Bursa Malaysia Financial Intelligence</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-mono font-bold text-[#F0F3F6] tracking-tight">
-              FINANCIAL INTELLIGENCE
+            <h1 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
+              Research Any Bursa Company
             </h1>
             <p className="text-[#8B949E] text-xs sm:text-sm leading-relaxed">
-              Enter any company or question. The terminal automatically pulls the financial report, extracts statement tables, and indexes regulatory notes into a 4-Stage RAG copilot.
+              Search by company name, ticker code, or ask an analytical question. The platform pulls quarterly financial statements and answers your questions using official filings.
             </p>
           </div>
 
-          {/* Interactive Hero Search Input Bar */}
+          {/* Prominent Search Box */}
           <div className="w-full max-w-2xl relative">
             <form onSubmit={handleSearchSubmit} className="relative">
               <div className="relative flex items-center">
-                <span className="absolute left-3.5 text-[#8B949E] font-mono text-sm select-none">&gt;</span>
+                <Search className="w-4 h-4 sm:w-5 sm:h-5 absolute left-3.5 text-[#8B949E]" />
                 <input
                   type="text"
                   value={searchQuery}
                   onFocus={() => {
-                    setIsInputActive(true);
+                    setIsInputFocused(true);
                     setAssistantDismissed(false);
                   }}
                   onChange={(e) => {
                     setSearchQuery(e.target.value);
-                    setIsInputActive(true);
+                    setIsInputFocused(true);
                   }}
                   placeholder="e.g. Tenaga, Maybank, or 'analyse financial report for Tenaga'..."
-                  className="w-full bg-[#121417] border border-[#1F2328] hover:border-[#30363D] focus:border-[#38BDF8] rounded-[3px] pl-8 pr-28 py-3 text-xs sm:text-sm font-mono text-[#F0F3F6] placeholder:text-[#6E7681] focus:outline-none transition"
+                  className="w-full bg-[#121417] border border-[#1F2328] hover:border-[#30363D] focus:border-blue-500 rounded-lg pl-10 pr-24 py-3 sm:py-3.5 text-xs sm:text-sm text-white placeholder:text-[#6E7681] focus:outline-none transition shadow-sm"
                   autoFocus
                 />
                 <button
                   type="submit"
                   disabled={loading || !searchQuery.trim()}
-                  className="absolute right-1.5 bg-[#1F2328] hover:bg-[#30363D] text-[#F0F3F6] px-3 py-2 rounded-[2px] text-xs font-mono font-semibold border border-[#30363D] disabled:opacity-40 flex items-center space-x-1 transition"
+                  className="absolute right-1.5 bg-blue-600 hover:bg-blue-500 text-white px-3.5 py-2 rounded text-xs font-semibold disabled:opacity-40 flex items-center space-x-1 transition"
                 >
                   {loading ? (
                     <>
-                      <RefreshCw className="w-3 h-3 animate-spin text-[#38BDF8]" />
-                      <span className="hidden sm:inline">INGESTING...</span>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Loading...</span>
                     </>
                   ) : (
                     <>
-                      <span>SEARCH</span>
-                      <CornerDownLeft className="w-3 h-3 text-[#38BDF8]" />
+                      <span>Analyze</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
                     </>
                   )}
                 </button>
               </div>
             </form>
-
-            {/* Quick helper tip below search input */}
-            <p className="text-[10px] text-[#8B949E] font-mono mt-1.5 text-center">
-              TIP: Type commands like <span className="text-[#38BDF8]">&quot;analyse financial report for 5347&quot;</span> or click any equity below
+            <p className="text-[11px] text-[#8B949E] mt-2 text-center">
+              Try typing <span className="text-blue-400">&quot;analyse financial report for Tenaga&quot;</span> or click an equity below
             </p>
           </div>
 
-          {/* Popular Equities Grid - Responsive & Touch-Friendly */}
-          <div className="w-full space-y-2">
-            <div className="flex items-center justify-between border-b border-[#1F2328] pb-1">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#8B949E]">
-                QUICK ACCESS EQUITIES // SELECT TO ANALYZE
-              </span>
-              <span className="text-[10px] font-mono text-[#8B949E]">BURSA MAIN MARKET</span>
+          {/* Popular Malaysian Companies Grid */}
+          <div className="w-full space-y-2.5">
+            <div className="flex items-center justify-between border-b border-[#1F2328] pb-1.5">
+              <span className="text-xs font-semibold text-white">Popular Companies</span>
+              <span className="text-[11px] text-[#8B949E]">Bursa Malaysia</span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-[#1F2328] border border-[#1F2328] rounded-[2px]">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
               {POPULAR_COMPANIES.map((company) => (
                 <button
                   key={company.code}
                   onClick={() => loadStockData(company.code)}
                   disabled={loading}
-                  className="bg-[#121417] hover:bg-[#16191D] p-2.5 text-left transition flex flex-col justify-between group active:scale-[0.99]"
+                  className="bg-[#121417] hover:bg-[#16191D] p-3 rounded border border-[#1F2328] hover:border-[#30363D] text-left transition flex flex-col justify-between group active:scale-[0.99]"
                 >
                   <div className="flex items-center justify-between w-full mb-1">
-                    <span className="font-mono text-xs font-bold text-[#F0F3F6] group-hover:text-[#38BDF8]">
-                      {company.ticker}
+                    <span className="text-xs font-bold text-white group-hover:text-blue-400">
+                      {company.name}
                     </span>
-                    <span className={`font-mono text-[11px] tabular-nums ${company.positive ? "text-[#10B981]" : "text-[#F85149]"}`}>
+                    <span className={`text-[11px] font-semibold tabular-nums ${company.positive ? "text-emerald-400" : "text-rose-400"}`}>
                       {company.positive ? "+" : ""}{company.change.toFixed(2)}%
                     </span>
                   </div>
-                  <div>
-                    <span className="text-[11px] font-medium text-[#8B949E] block truncate">
-                      {company.name}
+                  <div className="flex items-baseline justify-between mt-1">
+                    <span className="text-[11px] text-[#8B949E]">
+                      {company.ticker}
                     </span>
-                    <span className="font-mono text-xs text-[#F0F3F6] tabular-nums block font-bold">
+                    <span className="text-xs font-bold text-white tabular-nums">
                       RM {company.price.toFixed(2)}
                     </span>
                   </div>
@@ -580,85 +571,56 @@ export default function TerminalPage() {
             </div>
           </div>
 
-          {/* Macroeconomic Indicators Grid */}
-          <div className="w-full space-y-2">
-            <div className="flex items-center justify-between border-b border-[#1F2328] pb-1">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#8B949E]">
-                MACROECONOMIC BENCHMARKS
-              </span>
-              <span className="text-[10px] font-mono text-[#8B949E]">BANK NEGARA MALAYSIA / GLOBAL</span>
+          {/* Market Overview Indicators */}
+          <div className="w-full space-y-2.5">
+            <div className="flex items-center justify-between border-b border-[#1F2328] pb-1.5">
+              <span className="text-xs font-semibold text-white">Market Overview</span>
+              <span className="text-[11px] text-[#8B949E]">Live Benchmarks</span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-[#1F2328] border border-[#1F2328] rounded-[2px] text-xs">
-              <div className="bg-[#121417] p-2.5">
-                <span className="text-[10px] font-mono text-[#8B949E] block">FBM KLCI INDEX</span>
-                <span className="text-sm font-mono font-bold text-[#F0F3F6] tabular-nums">1,624.18</span>
-                <span className="text-[10px] font-mono text-[#10B981] block tabular-nums">+5.12 (+0.32%)</span>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5 text-xs">
+              <div className="bg-[#121417] p-3 rounded border border-[#1F2328]">
+                <span className="text-[11px] text-[#8B949E] block mb-0.5">FBM KLCI Index</span>
+                <span className="text-sm font-bold text-white tabular-nums">1,624.18</span>
+                <span className="text-[11px] text-emerald-400 block font-medium mt-0.5">+5.12 (+0.32%)</span>
               </div>
-              <div className="bg-[#121417] p-2.5">
-                <span className="text-[10px] font-mono text-[#8B949E] block">USD / MYR SPOT</span>
-                <span className="text-sm font-mono font-bold text-[#F0F3F6] tabular-nums">4.4125</span>
-                <span className="text-[10px] font-mono text-[#10B981] block tabular-nums">-0.0065 (-0.15%)</span>
+              <div className="bg-[#121417] p-3 rounded border border-[#1F2328]">
+                <span className="text-[11px] text-[#8B949E] block mb-0.5">USD / MYR</span>
+                <span className="text-sm font-bold text-white tabular-nums">4.4125</span>
+                <span className="text-[11px] text-emerald-400 block font-medium mt-0.5">-0.0065 (-0.15%)</span>
               </div>
-              <div className="bg-[#121417] p-2.5">
-                <span className="text-[10px] font-mono text-[#8B949E] block">BRENT CRUDE SPOT</span>
-                <span className="text-sm font-mono font-bold text-[#F0F3F6] tabular-nums">$73.87</span>
-                <span className="text-[10px] font-mono text-[#10B981] block tabular-nums">+0.48 (+0.65%)</span>
+              <div className="bg-[#121417] p-3 rounded border border-[#1F2328]">
+                <span className="text-[11px] text-[#8B949E] block mb-0.5">Brent Crude</span>
+                <span className="text-sm font-bold text-white tabular-nums">$73.87</span>
+                <span className="text-[11px] text-emerald-400 block font-medium mt-0.5">+$0.48 (+0.65%)</span>
               </div>
-              <div className="bg-[#121417] p-2.5">
-                <span className="text-[10px] font-mono text-[#8B949E] block">BNM POLICY RATE (OPR)</span>
-                <span className="text-sm font-mono font-bold text-[#F0F3F6] tabular-nums">3.00%</span>
-                <span className="text-[10px] font-mono text-[#8B949E] block">NEUTRAL</span>
-              </div>
-            </div>
-          </div>
-
-          {/* 4-Stage RAG Pipeline Information */}
-          <div className="w-full space-y-2">
-            <div className="flex items-center justify-between border-b border-[#1F2328] pb-1">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#8B949E]">
-                SYSTEM PIPELINE // 4-STAGE RETRIEVAL ARCHITECTURE
-              </span>
-              <span className="text-[10px] font-mono text-[#8B949E]">CMSA 2007 VERIFIED</span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-px bg-[#1F2328] border border-[#1F2328] rounded-[2px] text-xs">
-              <div className="bg-[#121417] p-2.5">
-                <span className="text-[#38BDF8] font-mono text-[10px] font-bold block mb-0.5">STAGE 1: AST CHUNKING</span>
-                <p className="text-[#8B949E] text-[11px] leading-snug">Extracts tables and keeps Part B notes in parent-child hierarchy.</p>
-              </div>
-              <div className="bg-[#121417] p-2.5">
-                <span className="text-[#38BDF8] font-mono text-[10px] font-bold block mb-0.5">STAGE 2: HYBRID RRF</span>
-                <p className="text-[#8B949E] text-[11px] leading-snug">Unites dense ChromaDB vectors with sparse BM25 Okapi keywords.</p>
-              </div>
-              <div className="bg-[#121417] p-2.5">
-                <span className="text-[#38BDF8] font-mono text-[10px] font-bold block mb-0.5">STAGE 3: FLASHRANK</span>
-                <p className="text-[#8B949E] text-[11px] leading-snug">Neural cross-encoder reranks top regulatory passages in ~15ms on CPU.</p>
-              </div>
-              <div className="bg-[#121417] p-2.5">
-                <span className="text-[#10B981] font-mono text-[10px] font-bold block mb-0.5">STAGE 4: CITED SYNTHESIS</span>
-                <p className="text-[#8B949E] text-[11px] leading-snug">Cites specific explanatory notes ([Note B1], [Note B3]) with zero hallucination.</p>
+              <div className="bg-[#121417] p-3 rounded border border-[#1F2328]">
+                <span className="text-[11px] text-[#8B949E] block mb-0.5">BNM OPR Rate</span>
+                <span className="text-sm font-bold text-white tabular-nums">3.00%</span>
+                <span className="text-[11px] text-[#8B949E] block font-medium mt-0.5">Neutral Policy</span>
               </div>
             </div>
           </div>
 
           {/* ========================================================================= */}
-          {/* USER-REQUESTED INTERACTIVE COPILOT POPUP AT BOTTOM OF START PAGE          */}
+          {/* USER-FRIENDLY POPUP ASSISTANT CARD AT BOTTOM OF START PAGE                */}
           {/* Confirms company intended + captures user instruction + offers suggestions */}
           {/* ========================================================================= */}
-          {(isInputActive || searchQuery.trim().length > 0) && !assistantDismissed && (
-            <div className="fixed bottom-3 sm:bottom-5 left-1/2 -translate-x-1/2 w-[94%] max-w-lg z-50 bg-[#121417] border border-[#30363D] shadow-2xl rounded-[3px] p-3 text-xs font-mono animate-in fade-in slide-in-from-bottom-2 duration-150">
+          {(isInputFocused || searchQuery.trim().length > 0) && !assistantDismissed && (
+            <div className="fixed bottom-3 sm:bottom-5 left-1/2 -translate-x-1/2 w-[94%] max-w-lg z-50 bg-[#121417] border border-[#30363D] shadow-2xl rounded-lg p-3.5 text-xs animate-in fade-in slide-in-from-bottom-2 duration-150">
               
-              {/* Popup Header */}
-              <div className="flex items-center justify-between border-b border-[#1F2328] pb-1.5 mb-2">
-                <div className="flex items-center space-x-1.5">
-                  <Bot className="w-3.5 h-3.5 text-[#38BDF8]" />
-                  <span className="font-bold text-[#F0F3F6] text-[11px]">QUERY ASSISTANT // CONFIRMATION</span>
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-[#1F2328] pb-2 mb-2.5">
+                <div className="flex items-center space-x-2">
+                  <div className="w-5 h-5 rounded-full bg-blue-600/20 text-blue-400 flex items-center justify-center">
+                    <Sparkles className="w-3 h-3" />
+                  </div>
+                  <span className="font-bold text-white text-xs">Research Assistant</span>
                 </div>
                 <button
                   onClick={() => setAssistantDismissed(true)}
-                  className="text-[#8B949E] hover:text-[#F0F3F6] p-0.5"
-                  title="Close Assistant"
+                  className="text-[#8B949E] hover:text-white p-1 rounded hover:bg-[#1F2328]"
+                  title="Close"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -666,29 +628,28 @@ export default function TerminalPage() {
 
               {/* Case 1: Company Matched */}
               {parsedIntent.company ? (
-                <div className="space-y-2">
-                  <div className="bg-[#090A0C] border border-[#1F2328] p-2 rounded-[2px]">
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-[#8B949E]">DETECTED SECURITY:</span>
-                      <span className="font-bold text-[#10B981] flex items-center space-x-1">
+                <div className="space-y-2.5">
+                  <div className="bg-[#090A0C] border border-[#1F2328] p-2.5 rounded">
+                    <div className="flex items-center justify-between text-[11px] text-[#8B949E] mb-1">
+                      <span>Target Company:</span>
+                      <span className="text-emerald-400 font-medium flex items-center space-x-1">
                         <Check className="w-3 h-3" />
-                        <span>MATCHED</span>
+                        <span>Identified</span>
                       </span>
                     </div>
-                    <div className="flex items-baseline justify-between mt-1">
-                      <span className="text-[#F0F3F6] font-bold text-sm">
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-white font-bold text-sm">
                         {parsedIntent.company.name} ({parsedIntent.company.ticker})
                       </span>
-                      <span className="text-[#38BDF8] font-bold tabular-nums">
+                      <span className="text-blue-400 font-bold tabular-nums">
                         RM {parsedIntent.company.price.toFixed(2)}
                       </span>
                     </div>
 
-                    {/* Instruction preview if user typed additional commands */}
                     {parsedIntent.instruction ? (
-                      <div className="mt-2 pt-1.5 border-t border-[#1F2328] text-[11px]">
-                        <span className="text-[#8B949E] block mb-0.5">INSTRUCTION TO EXECUTE IN CHATBOT:</span>
-                        <div className="text-[#38BDF8] bg-[#16191D] p-1.5 border border-[#1F2328] rounded-[2px] font-sans italic">
+                      <div className="mt-2 pt-2 border-t border-[#1F2328] text-[11px]">
+                        <span className="text-[#8B949E] block mb-1">Your request will be answered automatically:</span>
+                        <div className="text-blue-300 bg-[#16191D] p-2 rounded border border-[#1F2328] font-medium">
                           &quot;{parsedIntent.instruction}&quot;
                         </div>
                       </div>
@@ -696,74 +657,72 @@ export default function TerminalPage() {
                   </div>
 
                   {/* Primary Action Button */}
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => {
-                        const comp = parsedIntent.company!;
-                        loadStockData(comp.code, parsedIntent.instruction);
-                        setAssistantDismissed(true);
-                      }}
-                      disabled={loading}
-                      className="flex-1 bg-[#10B981] hover:bg-[#059669] text-[#090A0C] font-bold py-2 px-3 rounded-[2px] flex items-center justify-center space-x-1.5 transition"
-                    >
-                      {loading ? (
-                        <>
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                          <span>PULLING FILING...</span>
-                        </>
-                      ) : (
-                        <>
-                          <span>
-                            {parsedIntent.instruction ? "CONFIRM & RUN INSTRUCTION" : `ANALYZE ${parsedIntent.company.name.toUpperCase()}`}
-                          </span>
-                          <ArrowRight className="w-3.5 h-3.5" />
-                        </>
-                      )}
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => {
+                      const comp = parsedIntent.company!;
+                      loadStockData(comp.code, parsedIntent.instruction);
+                      setAssistantDismissed(true);
+                    }}
+                    disabled={loading}
+                    className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-3 rounded flex items-center justify-center space-x-1.5 transition text-xs shadow"
+                  >
+                    {loading ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Fetching Financial Reports...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>
+                          {parsedIntent.instruction ? `Confirm & Analyze ${parsedIntent.company.name}` : `View ${parsedIntent.company.name} Overview`}
+                        </span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </>
+                    )}
+                  </button>
 
-                  {/* Quick Preset Query Suggestions */}
-                  <div className="pt-1 border-t border-[#1F2328]">
-                    <span className="text-[10px] text-[#8B949E] block mb-1">OR RUN SUGGESTED PROMPT:</span>
-                    <div className="flex flex-wrap gap-1">
+                  {/* Quick Suggested Queries */}
+                  <div className="pt-1.5 border-t border-[#1F2328]">
+                    <span className="text-[10px] text-[#8B949E] block mb-1.5">Or choose a common topic:</span>
+                    <div className="flex flex-wrap gap-1.5">
                       <button
                         onClick={() => {
                           const comp = parsedIntent.company!;
-                          loadStockData(comp.code, "Perform a comprehensive analysis of the financial report and Note B1 revenue drivers.");
+                          loadStockData(comp.code, "Summarize revenue drivers and segment performance from Note B1.");
                           setAssistantDismissed(true);
                         }}
-                        className="bg-[#16191D] hover:bg-[#1F2328] text-[#8B949E] hover:text-[#F0F3F6] text-[10px] px-1.5 py-0.5 rounded-[2px] border border-[#1F2328] transition"
+                        className="bg-[#16191D] hover:bg-[#1F2328] text-[#8B949E] hover:text-white text-[11px] px-2 py-1 rounded border border-[#1F2328] transition"
                       >
-                        + Note B1 Revenue Breakdown
+                        Revenue & Margins
                       </button>
                       <button
                         onClick={() => {
                           const comp = parsedIntent.company!;
-                          loadStockData(comp.code, "Analyze Note B3 prospects, capital expenditure plans, and operational risks.");
+                          loadStockData(comp.code, "What are the management's key operating risks and market outlook in Note B3?");
                           setAssistantDismissed(true);
                         }}
-                        className="bg-[#16191D] hover:bg-[#1F2328] text-[#8B949E] hover:text-[#F0F3F6] text-[10px] px-1.5 py-0.5 rounded-[2px] border border-[#1F2328] transition"
+                        className="bg-[#16191D] hover:bg-[#1F2328] text-[#8B949E] hover:text-white text-[11px] px-2 py-1 rounded border border-[#1F2328] transition"
                       >
-                        + Note B3 Board Prospects
+                        Management Outlook
                       </button>
                       <button
                         onClick={() => {
                           const comp = parsedIntent.company!;
-                          loadStockData(comp.code, "Summarize total borrowings, gearing ratio, and debt covenants.");
+                          loadStockData(comp.code, "Summarize total borrowings, gearing ratio, and debt obligations.");
                           setAssistantDismissed(true);
                         }}
-                        className="bg-[#16191D] hover:bg-[#1F2328] text-[#8B949E] hover:text-[#F0F3F6] text-[10px] px-1.5 py-0.5 rounded-[2px] border border-[#1F2328] transition"
+                        className="bg-[#16191D] hover:bg-[#1F2328] text-[#8B949E] hover:text-white text-[11px] px-2 py-1 rounded border border-[#1F2328] transition"
                       >
-                        + Debt & Covenants
+                        Debt & Cash Position
                       </button>
                     </div>
                   </div>
                 </div>
               ) : (
-                /* Case 2: No Exact Company Matched Yet - Provide Quick Selector */
+                /* Case 2: No exact match yet */
                 <div className="space-y-2">
                   <p className="text-[#8B949E] text-[11px]">
-                    Which Bursa company would you like to analyze? Click one to confirm:
+                    Which Bursa Malaysia company would you like to research?
                   </p>
                   <div className="grid grid-cols-2 gap-1.5">
                     {POPULAR_COMPANIES.slice(0, 4).map((c) => (
@@ -774,21 +733,16 @@ export default function TerminalPage() {
                           loadStockData(c.code, instruction);
                           setAssistantDismissed(true);
                         }}
-                        className="bg-[#090A0C] hover:bg-[#16191D] text-left p-1.5 border border-[#1F2328] hover:border-[#38BDF8] rounded-[2px] transition flex items-center justify-between"
+                        className="bg-[#090A0C] hover:bg-[#16191D] text-left p-2 border border-[#1F2328] hover:border-blue-500 rounded transition flex items-center justify-between"
                       >
                         <div>
-                          <span className="font-bold text-[#F0F3F6] block text-[11px]">{c.name}</span>
+                          <span className="font-bold text-white block text-xs">{c.name}</span>
                           <span className="text-[10px] text-[#8B949E]">{c.ticker}</span>
                         </div>
-                        <span className="text-[10px] text-[#38BDF8]">SELECT &gt;</span>
+                        <span className="text-[10px] text-blue-400 font-medium">Select →</span>
                       </button>
                     ))}
                   </div>
-                  {searchQuery.trim() && (
-                    <div className="text-[10px] text-[#8B949E] pt-1 border-t border-[#1F2328]">
-                      Your instruction: <span className="text-[#F0F3F6]">&quot;{searchQuery}&quot;</span> will run immediately after selecting a company.
-                    </div>
-                  )}
                 </div>
               )}
 
@@ -798,106 +752,108 @@ export default function TerminalPage() {
         </main>
       )}
 
-      {/* 3. VIEW 2: ACTIVE STOCK TERMINAL WORKSPACE */}
+      {/* 3. VIEW 2: ACTIVE COMPANY FINANCIAL WORKSPACE */}
       {view === "terminal" && data && (
-        <main className="flex-1 w-full max-w-7xl mx-auto p-2 sm:p-3 space-y-2">
+        <main className="flex-1 w-full max-w-7xl mx-auto p-2 sm:p-4 space-y-3">
           
           {/* Mobile Tab Switcher */}
-          <div className="lg:hidden bg-[#121417] border border-[#1F2328] rounded-[2px] p-0.5 flex text-xs font-mono">
+          <div className="lg:hidden bg-[#121417] border border-[#1F2328] rounded p-1 flex text-xs">
             <button
-              onClick={() => setMobileTab("dashboard")}
-              className={`flex-1 py-1.5 px-2 rounded-[2px] font-bold transition text-center ${
-                mobileTab === "dashboard" ? "bg-[#1F2328] text-[#F0F3F6]" : "text-[#8B949E]"
+              onClick={() => setActiveTab("overview")}
+              className={`flex-1 py-1.5 px-3 rounded font-semibold transition text-center ${
+                activeTab === "overview" ? "bg-blue-600 text-white" : "text-[#8B949E] hover:text-white"
               }`}
             >
-              DATA_DASHBOARD
+              Overview & Financials
             </button>
             <button
-              onClick={() => setMobileTab("console")}
-              className={`flex-1 py-1.5 px-2 rounded-[2px] font-bold transition text-center flex items-center justify-center space-x-1 ${
-                mobileTab === "console" ? "bg-[#1F2328] text-[#F0F3F6]" : "text-[#8B949E]"
+              onClick={() => setActiveTab("chat")}
+              className={`flex-1 py-1.5 px-3 rounded font-semibold transition text-center flex items-center justify-center space-x-1.5 ${
+                activeTab === "chat" ? "bg-blue-600 text-white" : "text-[#8B949E] hover:text-white"
               }`}
             >
-              <TerminalIcon className="w-3.5 h-3.5 text-[#38BDF8]" />
-              <span>COMMAND_CONSOLE</span>
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>AI Research Assistant</span>
             </button>
           </div>
 
-          {/* Active Security Ribbon Header - Responsive Wrap */}
-          <div className="bg-[#121417] border border-[#1F2328] rounded-[2px] px-3 py-2 flex flex-wrap items-center justify-between gap-3 text-xs">
+          {/* Stock Header Banner */}
+          <div className="bg-[#121417] border border-[#1F2328] rounded-lg p-3 sm:p-4 flex flex-wrap items-center justify-between gap-3 text-xs">
             <div className="flex items-center space-x-3">
-              <span className="font-mono text-sm sm:text-base font-bold text-[#F0F3F6] tracking-tight">
-                {data.stock.name.toUpperCase()}
-              </span>
-              <span className="font-mono text-xs bg-[#16191D] text-[#8B949E] px-1.5 py-0.2 border border-[#1F2328] rounded-[2px]">
-                {data.stock.ticker}
-              </span>
-              <div className="flex items-baseline space-x-2 font-mono">
-                <span className="text-sm sm:text-base font-bold text-[#F0F3F6] tabular-nums">
-                  RM {data.stock.price.toFixed(2)}
-                </span>
-                <span className={`text-[11px] font-bold tabular-nums ${isPositive ? "text-[#10B981]" : "text-[#F85149]"}`}>
-                  {isPositive ? "+" : ""}{data.stock.change_pct.toFixed(2)}%
-                </span>
+              <div>
+                <div className="flex items-center space-x-2">
+                  <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight">
+                    {data.stock.name}
+                  </h1>
+                  <span className="bg-[#16191D] text-[#8B949E] text-xs px-2 py-0.5 rounded border border-[#1F2328] font-mono">
+                    {data.stock.ticker}
+                  </span>
+                </div>
+                <div className="flex items-baseline space-x-2 mt-0.5">
+                  <span className="text-xl sm:text-2xl font-bold text-white tabular-nums">
+                    RM {data.stock.price.toFixed(2)}
+                  </span>
+                  <span className={`text-xs font-semibold tabular-nums flex items-center ${isPositive ? "text-emerald-400" : "text-rose-400"}`}>
+                    {isPositive ? <TrendingUp className="w-3.5 h-3.5 mr-0.5" /> : <TrendingDown className="w-3.5 h-3.5 mr-0.5" />}
+                    {isPositive ? "+" : ""}{data.stock.change_pct.toFixed(2)}% Today
+                  </span>
+                </div>
               </div>
             </div>
 
-            {/* Metrics Ribbon */}
-            <div className="flex items-center space-x-3 sm:space-x-4 font-mono text-[11px] text-[#8B949E] overflow-x-auto w-full sm:w-auto py-0.5">
-              <div className="shrink-0">
-                <span className="text-[10px] text-[#8B949E] mr-1">MCAP:</span>
-                <span className="text-[#F0F3F6] font-semibold tabular-nums">
+            {/* Metrics Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 w-full sm:w-auto text-xs">
+              <div className="bg-[#090A0C] p-2 rounded border border-[#1F2328]">
+                <span className="text-[10px] text-[#8B949E] block">Market Cap</span>
+                <span className="text-white font-semibold tabular-nums">
                   RM {data.stock.market_cap ? (data.stock.market_cap / 1_000_000_000).toFixed(1) + "B" : "122.5B"}
                 </span>
               </div>
-              <span className="text-[#1F2328]">|</span>
-              <div className="shrink-0">
-                <span className="text-[10px] text-[#8B949E] mr-1">P/E:</span>
-                <span className="text-[#F0F3F6] font-semibold tabular-nums">
+              <div className="bg-[#090A0C] p-2 rounded border border-[#1F2328]">
+                <span className="text-[10px] text-[#8B949E] block">P/E Ratio</span>
+                <span className="text-white font-semibold tabular-nums">
                   {data.metrics.annualized_pe ? `${data.metrics.annualized_pe}x` : "12.8x"}
                 </span>
               </div>
-              <span className="text-[#1F2328]">|</span>
-              <div className="shrink-0">
-                <span className="text-[10px] text-[#8B949E] mr-1">NET_MARGIN:</span>
-                <span className="text-[#10B981] font-semibold tabular-nums">
+              <div className="bg-[#090A0C] p-2 rounded border border-[#1F2328]">
+                <span className="text-[10px] text-[#8B949E] block">Operating Margin</span>
+                <span className="text-emerald-400 font-semibold tabular-nums">
                   {data.metrics.net_margin_pct ? `${data.metrics.net_margin_pct}%` : "32.6%"}
                 </span>
               </div>
-              <span className="text-[#1F2328]">|</span>
-              <div className="shrink-0">
-                <span className="text-[10px] text-[#8B949E] mr-1">GEARING:</span>
-                <span className="text-[#F0F3F6] font-semibold tabular-nums">
+              <div className="bg-[#090A0C] p-2 rounded border border-[#1F2328]">
+                <span className="text-[10px] text-[#8B949E] block">Gearing Ratio</span>
+                <span className="text-white font-semibold tabular-nums">
                   {data.metrics.gearing_ratio ? `${data.metrics.gearing_ratio}x` : "0.45x"}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Continuous Tiled Grid: Left Data Dashboard (52%) + Right Command Console (48%) */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-2 items-start">
+          {/* 2-Column Responsive Workspace */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
             
-            {/* LEFT COLUMN: Charts & Tabular Statement Excerpt */}
-            <div className={`lg:col-span-6 space-y-2 ${mobileTab === "dashboard" ? "block" : "hidden lg:block"}`}>
+            {/* LEFT COLUMN: Charts & Financial Statement Tables */}
+            <div className={`lg:col-span-7 space-y-3 ${activeTab === "overview" ? "block" : "hidden lg:block"}`}>
               
-              {/* 1. Price Trajectory Chart - Sharp Solid Line */}
-              <div className="bg-[#121417] border border-[#1F2328] rounded-[2px] p-2 space-y-1.5">
-                <div className="flex items-center justify-between border-b border-[#1F2328] pb-1">
-                  <div className="flex items-center space-x-1.5 font-mono text-[11px]">
-                    <LineChart className="w-3.5 h-3.5 text-[#38BDF8]" />
-                    <span className="font-bold text-[#F0F3F6]">PRICE TRAJECTORY // MYR</span>
+              {/* 1. Price Area Chart */}
+              <div className="bg-[#121417] border border-[#1F2328] rounded-lg p-3 sm:p-4 space-y-2">
+                <div className="flex items-center justify-between border-b border-[#1F2328] pb-2">
+                  <div className="flex items-center space-x-2">
+                    <LineChart className="w-4 h-4 text-blue-400" />
+                    <span className="font-semibold text-xs text-white">Price History (MYR)</span>
                   </div>
 
                   {/* Interval Selector */}
-                  <div className="flex items-center space-x-0.5 bg-[#090A0C] border border-[#1F2328] p-0.5 rounded-[2px] text-[10px] font-mono">
+                  <div className="flex items-center space-x-1 bg-[#090A0C] border border-[#1F2328] p-0.5 rounded text-xs">
                     {(["1D", "5D", "1M", "6M", "1Y"] as const).map((interval) => (
                       <button
                         key={interval}
                         onClick={() => setSelectedInterval(interval)}
-                        className={`px-1.5 py-0.2 rounded-[1px] font-bold transition ${
+                        className={`px-2 py-0.5 rounded font-medium transition ${
                           selectedInterval === interval
-                            ? "bg-[#1F2328] text-[#38BDF8]"
-                            : "text-[#8B949E] hover:text-[#F0F3F6]"
+                            ? "bg-blue-600 text-white"
+                            : "text-[#8B949E] hover:text-white"
                         }`}
                       >
                         {interval}
@@ -906,23 +862,21 @@ export default function TerminalPage() {
                   </div>
                 </div>
 
-                <div className="h-36 sm:h-40 w-full">
+                <div className="h-44 sm:h-52 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="2 2" stroke="#1F2328" />
-                      <XAxis dataKey="time" stroke="#8B949E" tick={{ fontSize: 9, fontFamily: "monospace" }} />
-                      <YAxis domain={["auto", "auto"]} stroke="#8B949E" tick={{ fontSize: 9, fontFamily: "monospace" }} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1F2328" />
+                      <XAxis dataKey="time" stroke="#8B949E" tick={{ fontSize: 10 }} />
+                      <YAxis domain={["auto", "auto"]} stroke="#8B949E" tick={{ fontSize: 10 }} />
                       <Tooltip
                         contentStyle={{
                           backgroundColor: "#121417",
                           borderColor: "#1F2328",
-                          borderRadius: "2px",
+                          borderRadius: "4px",
                           fontSize: "11px",
-                          fontFamily: "monospace",
-                          color: "#F0F3F6",
-                          padding: "4px 8px"
+                          color: "#F0F3F6"
                         }}
-                        formatter={(value: any) => [`RM ${Number(value).toFixed(2)}`, "PRICE"]}
+                        formatter={(value: any) => [`RM ${Number(value).toFixed(2)}`, "Price"]}
                       />
                       <Area
                         type="monotone"
@@ -937,17 +891,17 @@ export default function TerminalPage() {
                 </div>
               </div>
 
-              {/* 2. Topline vs. Profit Bar Chart - High Density Timeline */}
-              <div className="bg-[#121417] border border-[#1F2328] rounded-[2px] p-2 space-y-1.5">
-                <div className="flex items-center justify-between border-b border-[#1F2328] pb-1">
-                  <div className="flex items-center space-x-1.5 font-mono text-[11px]">
-                    <BarChart2 className="w-3.5 h-3.5 text-[#10B981]" />
-                    <span className="font-bold text-[#F0F3F6]">TOPLINE VS PROFIT // RM 'M</span>
+              {/* 2. Topline Revenue vs. Net Profit Progression */}
+              <div className="bg-[#121417] border border-[#1F2328] rounded-lg p-3 sm:p-4 space-y-2">
+                <div className="flex items-center justify-between border-b border-[#1F2328] pb-2">
+                  <div className="flex items-center space-x-2">
+                    <BarChart2 className="w-4 h-4 text-emerald-400" />
+                    <span className="font-semibold text-xs text-white">Quarterly Revenue vs. Profit (RM &apos;M)</span>
                   </div>
-                  <span className="text-[10px] font-mono text-[#8B949E]">5-QUARTER TIMELINE</span>
+                  <span className="text-[11px] text-[#8B949E]">Historical Progression</span>
                 </div>
 
-                <div className="h-28 w-full">
+                <div className="h-32 sm:h-36 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={data.historical_quarters || [
@@ -958,236 +912,217 @@ export default function TerminalPage() {
                         { quarter: "Q2 '26", revenue: 7200, profit: 2350 },
                       ]}
                       margin={{ top: 5, right: 5, left: -25, bottom: 0 }}
-                      barGap={2}
+                      barGap={4}
                     >
-                      <CartesianGrid strokeDasharray="2 2" stroke="#1F2328" />
-                      <XAxis dataKey="quarter" stroke="#8B949E" tick={{ fontSize: 9, fontFamily: "monospace" }} />
-                      <YAxis stroke="#8B949E" tick={{ fontSize: 9, fontFamily: "monospace" }} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1F2328" />
+                      <XAxis dataKey="quarter" stroke="#8B949E" tick={{ fontSize: 10 }} />
+                      <YAxis stroke="#8B949E" tick={{ fontSize: 10 }} />
                       <Tooltip
                         contentStyle={{
                           backgroundColor: "#121417",
                           borderColor: "#1F2328",
-                          borderRadius: "2px",
+                          borderRadius: "4px",
                           fontSize: "11px",
-                          fontFamily: "monospace",
-                          color: "#F0F3F6",
-                          padding: "4px 8px"
+                          color: "#F0F3F6"
                         }}
                         formatter={(value: any, name: any) => [
                           `RM ${Number(value).toLocaleString()} M`,
-                          name === "revenue" ? "REVENUE" : "NET PROFIT",
+                          name === "revenue" ? "Revenue" : "Net Profit",
                         ]}
                       />
-                      <Legend wrapperStyle={{ fontSize: "10px", fontFamily: "monospace" }} />
-                      <Bar dataKey="revenue" name="Revenue" fill="#64748B" barSize={12} radius={[0, 0, 0, 0]} isAnimationActive={false} />
-                      <Bar dataKey="profit" name="Net Profit" fill="#10B981" barSize={12} radius={[0, 0, 0, 0]} isAnimationActive={false} />
+                      <Legend wrapperStyle={{ fontSize: "11px" }} />
+                      <Bar dataKey="revenue" name="Revenue" fill="#64748B" barSize={14} radius={[2, 2, 0, 0]} isAnimationActive={false} />
+                      <Bar dataKey="profit" name="Net Profit" fill="#10B981" barSize={14} radius={[2, 2, 0, 0]} isAnimationActive={false} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               </div>
 
               {/* 3. Financial Statement Excerpt Table */}
-              <div className="bg-[#121417] border border-[#1F2328] rounded-[2px] p-2 space-y-1">
-                <div className="flex items-center justify-between border-b border-[#1F2328] pb-1">
-                  <span className="font-mono font-bold text-[11px] text-[#F0F3F6]">
-                    FINANCIAL STATEMENT EXCERPT
-                  </span>
-                  <span className="font-mono text-[10px] text-[#8B949E]">UNITS: RM '000</span>
+              <div className="bg-[#121417] border border-[#1F2328] rounded-lg p-3 sm:p-4 space-y-2">
+                <div className="flex items-center justify-between border-b border-[#1F2328] pb-2">
+                  <span className="font-semibold text-xs text-white">Financial Statement Excerpt</span>
+                  <span className="text-[11px] text-[#8B949E]">RM &apos;000</span>
                 </div>
 
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-[11px] table-zebra">
-                    <thead className="bg-[#090A0C] text-[#8B949E] font-mono text-[10px] uppercase border-b border-[#1F2328]">
+                  <table className="w-full text-left text-xs table-zebra">
+                    <thead className="bg-[#090A0C] text-[#8B949E] text-[11px] uppercase border-b border-[#1F2328]">
                       <tr>
-                        <th className="py-1 px-2">LINE_ITEM</th>
-                        <th className="py-1 px-2 text-right">CURRENT_QTR</th>
-                        <th className="py-1 px-2 text-right">PRECEDING_QTR</th>
-                        <th className="py-1 px-2 text-right">QOQ_DELTA</th>
+                        <th className="py-1.5 px-2.5 font-medium">Line Item</th>
+                        <th className="py-1.5 px-2.5 text-right font-medium">Current Qtr</th>
+                        <th className="py-1.5 px-2.5 text-right font-medium">Preceding Qtr</th>
+                        <th className="py-1.5 px-2.5 text-right font-medium">QoQ Change</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[#1F2328] font-mono">
+                    <tbody className="divide-y divide-[#1F2328]">
                       <tr>
-                        <td className="py-1 px-2 text-[#F0F3F6] font-sans">Revenue</td>
-                        <td className="py-1 px-2 text-right tabular-nums text-[#F0F3F6]">
+                        <td className="py-1.5 px-2.5 text-white font-medium">Revenue</td>
+                        <td className="py-1.5 px-2.5 text-right tabular-nums text-white">
                           {(data.financial_statement?.revenue || 7200000).toLocaleString()}
                         </td>
-                        <td className="py-1 px-2 text-right tabular-nums text-[#8B949E]">
+                        <td className="py-1.5 px-2.5 text-right tabular-nums text-[#8B949E]">
                           {(data.financial_statement?.prev_revenue || 6800000).toLocaleString()}
                         </td>
-                        <td className="py-1 px-2 text-right tabular-nums font-bold text-[#10B981]">
+                        <td className="py-1.5 px-2.5 text-right tabular-nums font-semibold text-emerald-400">
                           {data.metrics?.rev_growth_qoq >= 0 ? "+" : ""}{data.metrics?.rev_growth_qoq}%
                         </td>
                       </tr>
                       <tr>
-                        <td className="py-1 px-2 text-[#F0F3F6] font-sans">Net Profit (PATAMI)</td>
-                        <td className="py-1 px-2 text-right tabular-nums text-[#F0F3F6] font-bold">
+                        <td className="py-1.5 px-2.5 text-white font-medium">Net Profit (PATAMI)</td>
+                        <td className="py-1.5 px-2.5 text-right tabular-nums text-white font-bold">
                           {(data.financial_statement?.net_profit || 2350000).toLocaleString()}
                         </td>
-                        <td className="py-1 px-2 text-right tabular-nums text-[#8B949E]">
+                        <td className="py-1.5 px-2.5 text-right tabular-nums text-[#8B949E]">
                           {(data.financial_statement?.prev_net_profit || 2200000).toLocaleString()}
                         </td>
-                        <td className="py-1 px-2 text-right tabular-nums font-bold text-[#10B981]">
+                        <td className="py-1.5 px-2.5 text-right tabular-nums font-semibold text-emerald-400">
                           {data.metrics?.profit_growth_qoq >= 0 ? "+" : ""}{data.metrics?.profit_growth_qoq}%
                         </td>
                       </tr>
                       <tr>
-                        <td className="py-1 px-2 text-[#F0F3F6] font-sans">Total Borrowings</td>
-                        <td className="py-1 px-2 text-right tabular-nums text-[#F0F3F6]">
+                        <td className="py-1.5 px-2.5 text-white font-medium">Total Borrowings</td>
+                        <td className="py-1.5 px-2.5 text-right tabular-nums text-white">
                           {(data.financial_statement?.total_borrowings || 45000000).toLocaleString()}
                         </td>
-                        <td className="py-1 px-2 text-right tabular-nums text-[#8B949E]">
+                        <td className="py-1.5 px-2.5 text-right tabular-nums text-[#8B949E]">
                           {((data.financial_statement?.total_borrowings || 45000000) * 0.98).toLocaleString()}
                         </td>
-                        <td className="py-1 px-2 text-right tabular-nums text-[#8B949E]">+2.04%</td>
+                        <td className="py-1.5 px-2.5 text-right tabular-nums text-[#8B949E]">+2.04%</td>
                       </tr>
                       <tr>
-                        <td className="py-1 px-2 text-[#F0F3F6] font-sans">Cash & Bank Balances</td>
-                        <td className="py-1 px-2 text-right tabular-nums text-[#10B981] font-bold">
+                        <td className="py-1.5 px-2.5 text-white font-medium">Cash & Bank Balances</td>
+                        <td className="py-1.5 px-2.5 text-right tabular-nums text-emerald-400 font-bold">
                           {(data.financial_statement?.cash || 60000000).toLocaleString()}
                         </td>
-                        <td className="py-1 px-2 text-right tabular-nums text-[#8B949E]">
+                        <td className="py-1.5 px-2.5 text-right tabular-nums text-[#8B949E]">
                           {((data.financial_statement?.cash || 60000000) * 0.97).toLocaleString()}
                         </td>
-                        <td className="py-1 px-2 text-right tabular-nums text-[#10B981]">+3.09%</td>
+                        <td className="py-1.5 px-2.5 text-right tabular-nums text-emerald-400 font-semibold">+3.09%</td>
                       </tr>
                       <tr>
-                        <td className="py-1 px-2 text-[#F0F3F6] font-sans">Basic EPS (sen)</td>
-                        <td className="py-1 px-2 text-right tabular-nums text-[#F0F3F6] font-bold">
+                        <td className="py-1.5 px-2.5 text-white font-medium">Basic EPS (sen)</td>
+                        <td className="py-1.5 px-2.5 text-right tabular-nums text-white font-bold">
                           {(data.financial_statement?.eps_sen || 19.5).toFixed(2)}
                         </td>
-                        <td className="py-1 px-2 text-right tabular-nums text-[#8B949E]">
+                        <td className="py-1.5 px-2.5 text-right tabular-nums text-[#8B949E]">
                           {((data.financial_statement?.eps_sen || 19.5) * 0.94).toFixed(2)}
                         </td>
-                        <td className="py-1 px-2 text-right tabular-nums text-[#10B981]">+6.38%</td>
+                        <td className="py-1.5 px-2.5 text-right tabular-nums text-emerald-400 font-semibold">+6.38%</td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
               </div>
 
-              {/* 4. DCF Valuation Sensitivity Strip */}
-              <div className="bg-[#121417] border border-[#1F2328] rounded-[2px] p-2 space-y-1">
-                <div className="flex items-center justify-between border-b border-[#1F2328] pb-1">
-                  <div className="flex items-center space-x-1.5 font-mono text-[11px]">
-                    <Calculator className="w-3.5 h-3.5 text-[#8B949E]" />
-                    <span className="font-bold text-[#F0F3F6]">5-YEAR DCF SENSITIVITY MATRIX</span>
+              {/* 4. DCF Sensitivity Scenario Card */}
+              <div className="bg-[#121417] border border-[#1F2328] rounded-lg p-3 sm:p-4 space-y-2">
+                <div className="flex items-center justify-between border-b border-[#1F2328] pb-1.5">
+                  <div className="flex items-center space-x-2">
+                    <Calculator className="w-4 h-4 text-blue-400" />
+                    <span className="font-semibold text-xs text-white">5-Year DCF Valuation Scenarios</span>
                   </div>
-                  <span className="font-mono text-[10px] text-[#8B949E]">DETERMINISTIC SANDBOX</span>
+                  <span className="text-[11px] text-[#8B949E]">Cash Flow Sensitivity</span>
                 </div>
 
-                <div className="grid grid-cols-3 gap-1.5 text-center text-xs font-mono">
-                  <div className="bg-[#090A0C] p-1.5 border border-[#1F2328] rounded-[2px]">
-                    <span className="text-[10px] text-[#8B949E] block">CONSERVATIVE</span>
-                    <span className="font-bold text-[#F0F3F6] text-xs tabular-nums">RM {(data.stock.price * 1.05).toFixed(2)}</span>
-                    <span className="text-[9px] text-[#8B949E] block">WACC 10.0%</span>
+                <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                  <div className="bg-[#090A0C] p-2 rounded border border-[#1F2328]">
+                    <span className="text-[11px] text-[#8B949E] block mb-0.5">Conservative</span>
+                    <span className="font-bold text-white text-xs sm:text-sm tabular-nums">RM {(data.stock.price * 1.05).toFixed(2)}</span>
+                    <span className="text-[10px] text-[#8B949E] block mt-0.5">WACC: 10.0%</span>
                   </div>
-                  <div className="bg-[#16191D] p-1.5 border border-[#30363D] rounded-[2px]">
-                    <span className="text-[10px] text-[#38BDF8] block font-bold">BASE CASE</span>
-                    <span className="font-bold text-[#38BDF8] text-xs tabular-nums">RM {(data.stock.price * 1.25).toFixed(2)}</span>
-                    <span className="text-[9px] text-[#8B949E] block">WACC 8.5%</span>
+                  <div className="bg-blue-950/20 p-2 rounded border border-blue-800/40">
+                    <span className="text-[11px] text-blue-400 block font-semibold mb-0.5">Base Case</span>
+                    <span className="font-bold text-blue-300 text-xs sm:text-sm tabular-nums">RM {(data.stock.price * 1.25).toFixed(2)}</span>
+                    <span className="text-[10px] text-blue-400/80 block mt-0.5">WACC: 8.5%</span>
                   </div>
-                  <div className="bg-[#090A0C] p-1.5 border border-[#1F2328] rounded-[2px]">
-                    <span className="text-[10px] text-[#10B981] block">OPTIMISTIC</span>
-                    <span className="font-bold text-[#10B981] text-xs tabular-nums">RM {(data.stock.price * 1.48).toFixed(2)}</span>
-                    <span className="text-[9px] text-[#8B949E] block">WACC 7.0%</span>
+                  <div className="bg-[#090A0C] p-2 rounded border border-[#1F2328]">
+                    <span className="text-[11px] text-emerald-400 block mb-0.5">Optimistic</span>
+                    <span className="font-bold text-emerald-400 text-xs sm:text-sm tabular-nums">RM {(data.stock.price * 1.48).toFixed(2)}</span>
+                    <span className="text-[10px] text-[#8B949E] block mt-0.5">WACC: 7.0%</span>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* RIGHT COLUMN: Rigid Docked Command & Query Console */}
-            <div className={`lg:col-span-6 flex flex-col bg-[#121417] border border-[#1F2328] rounded-[2px] h-[550px] sm:h-[620px] lg:h-[670px] ${mobileTab === "console" ? "block" : "hidden lg:flex"}`}>
+            {/* RIGHT COLUMN: User-Friendly AI Financial Copilot */}
+            <div className={`lg:col-span-5 flex flex-col bg-[#121417] border border-[#1F2328] rounded-lg h-[520px] sm:h-[600px] lg:h-[680px] ${activeTab === "chat" ? "block" : "hidden lg:flex"}`}>
               
-              {/* Console Header Bar */}
-              <div className="p-2 bg-[#090A0C] border-b border-[#1F2328] flex items-center justify-between text-xs font-mono select-none">
+              {/* Copilot Header */}
+              <div className="p-3 bg-[#16191D] border-b border-[#1F2328] flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <TerminalIcon className="w-3.5 h-3.5 text-[#38BDF8]" />
-                  <span className="font-bold text-[#F0F3F6]">INTERACTIVE_COMMAND_CONSOLE</span>
-                  <span className="text-[10px] text-[#10B981] bg-[#16191D] px-1 border border-[#1F2328]">
-                    [ONLINE]
-                  </span>
+                  <div className="w-6 h-6 rounded-full bg-blue-600/20 text-blue-400 flex items-center justify-center">
+                    <Sparkles className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-xs text-white">AI Research Copilot</h3>
+                    <p className="text-[10px] text-[#8B949E]">Active: {data.stock.name} ({data.stock.ticker})</p>
+                  </div>
                 </div>
 
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => {
-                      setChatMessages([
-                        {
-                          role: "system",
-                          content: `LOG CLEARED // ACTIVE SECURITY: ${data.stock.name.toUpperCase()} (${data.stock.ticker})`,
-                          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
-                        }
-                      ]);
-                    }}
-                    className="text-[10px] text-[#8B949E] hover:text-[#F0F3F6] px-1.5 py-0.5 hover:bg-[#1F2328] border border-[#1F2328] rounded-[2px] transition"
-                  >
-                    [CLEAR]
-                  </button>
-                </div>
+                <button
+                  onClick={() => {
+                    setChatMessages([
+                      {
+                        role: "assistant",
+                        content: `Chat history cleared. Active context is **${data.stock.name} (${data.stock.ticker})**. How can I help you today?`,
+                        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                      }
+                    ]);
+                  }}
+                  className="text-[11px] text-[#8B949E] hover:text-white px-2 py-1 rounded hover:bg-[#1F2328] border border-transparent hover:border-[#30363D] transition"
+                  title="Clear conversation"
+                >
+                  Clear Chat
+                </button>
               </div>
 
-              {/* Discrete Query Shortcuts Toolbar */}
-              <div className="px-2 py-1 bg-[#121417] border-b border-[#1F2328] flex items-center space-x-2 overflow-x-auto text-[10px] font-mono whitespace-nowrap">
-                <span className="text-[#8B949E]">QUERIES:</span>
-                {DISCLOSURE_QUERIES.map((q, idx) => (
+              {/* Suggested Questions Pills */}
+              <div className="px-3 py-2 bg-[#121417] border-b border-[#1F2328] flex items-center space-x-1.5 overflow-x-auto text-xs whitespace-nowrap">
+                <span className="text-[11px] text-[#8B949E] shrink-0 mr-1">Suggestions:</span>
+                {SUGGESTED_QUESTIONS.map((q, idx) => (
                   <button
                     key={idx}
                     onClick={() => handleSendMessage(q.prompt)}
                     disabled={chatLoading}
-                    className="text-[#8B949E] hover:text-[#38BDF8] hover:bg-[#1F2328] px-1.5 py-0.5 border border-transparent hover:border-[#30363D] transition shrink-0 disabled:opacity-40"
+                    className="bg-[#16191D] hover:bg-[#1F2328] text-[#8B949E] hover:text-white text-[11px] px-2 py-0.5 rounded border border-[#1F2328] transition shrink-0 disabled:opacity-40"
                   >
-                    [{q.label}]
+                    {q.label}
                   </button>
                 ))}
               </div>
 
-              {/* Output Log Stream */}
-              <div className="flex-1 p-2.5 overflow-y-auto space-y-3 text-xs font-mono">
+              {/* Message Feed */}
+              <div className="flex-1 p-3 sm:p-4 overflow-y-auto space-y-3.5 text-xs">
                 {chatMessages.map((msg, index) => (
-                  <div key={index} className="space-y-1">
+                  <div key={index} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
                     
-                    {/* Timestamp & Sender Identifier */}
-                    <div className="flex items-center space-x-2 text-[10px] text-[#8B949E] select-none">
-                      <span>[{msg.time || "00:00:00"}]</span>
-                      {msg.role === "user" ? (
-                        <span className="font-bold text-[#F0F3F6]">&gt; USER_QUERY</span>
-                      ) : msg.role === "system" ? (
-                        <span className="text-[#D29922]">&gt;&gt; SYSTEM_DAEMON</span>
-                      ) : (
-                        <span className="font-bold text-[#38BDF8]">&gt; RAG_DISCLOSURE_ENGINE [CHROMA+BM25+FLASHRANK]</span>
-                      )}
+                    <div className="flex items-center space-x-1.5 mb-1 text-[10px] text-[#8B949E]">
+                      <span>{msg.role === "user" ? "You" : "Analyst Copilot"}</span>
+                      {msg.time && <span>• {msg.time}</span>}
                     </div>
 
-                    {/* Content Display */}
-                    <div className={`p-2 border rounded-[2px] ${
+                    <div className={`p-3 rounded-lg max-w-[92%] leading-relaxed ${
                       msg.role === "user"
-                        ? "bg-[#16191D] border-[#30363D] text-[#F0F3F6]"
-                        : msg.role === "system"
-                        ? "bg-[#090A0C] border-[#1F2328] text-[#D29922] font-mono text-[11px]"
-                        : "bg-[#090A0C] border-[#1F2328] text-[#F0F3F6]"
+                        ? "bg-blue-600 text-white rounded-tr-none"
+                        : "bg-[#16191D] text-slate-200 border border-[#1F2328] rounded-tl-none"
                     }`}>
                       {msg.role === "user" ? (
                         <p className="whitespace-pre-wrap">{msg.content}</p>
-                      ) : msg.role === "system" ? (
-                        <p className="whitespace-pre-wrap">{msg.content}</p>
                       ) : (
-                        <div className="prose prose-invert prose-xs max-w-none text-[#F0F3F6] font-sans leading-relaxed">
+                        <div className="prose prose-invert prose-xs max-w-none space-y-1.5 text-slate-200">
                           <ReactMarkdown
                             components={{
-                              h1: ({ node, ...props }) => <h3 className="text-xs font-mono font-bold text-[#38BDF8] border-b border-[#1F2328] pb-1 mt-1 mb-1" {...props} />,
-                              h2: ({ node, ...props }) => <h4 className="text-xs font-mono font-bold text-[#F0F3F6] mt-1 mb-0.5" {...props} />,
-                              h3: ({ node, ...props }) => <h5 className="text-[11px] font-mono font-bold text-[#8B949E] mt-1 mb-0.5" {...props} />,
-                              p: ({ node, ...props }) => <p className="mb-1.5 leading-relaxed text-[12px]" {...props} />,
-                              ul: ({ node, ...props }) => <ul className="list-disc pl-4 space-y-0.5 mb-1.5 text-[12px]" {...props} />,
-                              ol: ({ node, ...props }) => <ol className="list-decimal pl-4 space-y-0.5 mb-1.5 text-[12px]" {...props} />,
-                              li: ({ node, ...props }) => <li className="text-[#F0F3F6]" {...props} />,
-                              strong: ({ node, ...props }) => <strong className="font-bold text-[#38BDF8] font-mono" {...props} />,
+                              h1: ({ node, ...props }) => <h3 className="text-xs font-bold text-white border-b border-[#1F2328] pb-1 mt-1 mb-1" {...props} />,
+                              h2: ({ node, ...props }) => <h4 className="text-xs font-bold text-white mt-1 mb-0.5" {...props} />,
+                              p: ({ node, ...props }) => <p className="mb-1.5 leading-relaxed text-xs" {...props} />,
+                              ul: ({ node, ...props }) => <ul className="list-disc pl-4 space-y-0.5 mb-1 text-xs" {...props} />,
+                              ol: ({ node, ...props }) => <ol className="list-decimal pl-4 space-y-0.5 mb-1 text-xs" {...props} />,
+                              li: ({ node, ...props }) => <li className="text-slate-200" {...props} />,
+                              strong: ({ node, ...props }) => <strong className="font-bold text-white" {...props} />,
                               blockquote: ({ node, ...props }) => (
-                                <blockquote className="border-l-2 border-[#38BDF8] pl-2 py-0.5 my-1 bg-[#16191D] text-[#8B949E] italic text-[11px]" {...props} />
+                                <blockquote className="border-l-2 border-blue-500 pl-2 py-0.5 my-1 bg-[#121417] text-[#8B949E] italic text-[11px]" {...props} />
                               ),
-                              code: ({ node, ...props }) => (
-                                <code className="bg-[#16191D] text-[#38BDF8] font-mono px-1 py-0.2 rounded-[2px] border border-[#1F2328] text-[11px]" {...props} />
-                              )
                             }}
                           >
                             {msg.content}
@@ -1199,49 +1134,49 @@ export default function TerminalPage() {
                 ))}
 
                 {chatLoading && (
-                  <div className="space-y-1">
-                    <div className="text-[10px] text-[#8B949E] font-mono">
-                      &gt; SEARCHING RRF RETRIEVAL INDEX + FLASHRANK NEURAL RERANKING...
-                    </div>
-                    <div className="bg-[#090A0C] border border-[#1F2328] p-2 text-xs font-mono text-[#8B949E] flex items-center space-x-2">
-                      <div className="w-1.5 h-1.5 bg-[#38BDF8] animate-pulse"></div>
-                      <span>Extracting cited notes from AST filing chunks...</span>
+                  <div className="flex flex-col items-start">
+                    <div className="text-[10px] text-[#8B949E] mb-1">Analyst Copilot is analyzing filings...</div>
+                    <div className="bg-[#16191D] border border-[#1F2328] rounded-lg rounded-tl-none p-3 flex items-center space-x-2 text-slate-300">
+                      <div className="flex space-x-1">
+                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce"></div>
+                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+                      </div>
+                      <span className="text-[11px] text-[#8B949E]">Reading Part B regulatory notes & verifying tables...</span>
                     </div>
                   </div>
                 )}
                 <div ref={chatBottomRef} />
               </div>
 
-              {/* Docked Command Bar at Bottom */}
-              <div className="p-2 bg-[#090A0C] border-t border-[#1F2328]">
+              {/* Chat Input Bar */}
+              <div className="p-3 bg-[#121417] border-t border-[#1F2328]">
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
                     handleSendMessage();
                   }}
-                  className="flex items-center space-x-1.5"
+                  className="flex items-center space-x-2"
                 >
-                  <span className="text-[#8B949E] font-mono text-xs select-none pl-1">&gt;</span>
                   <input
                     type="text"
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
-                    placeholder={`Query ${data.stock.name} disclosures (e.g. Note B1 revenue breakdown, debt covenants)...`}
-                    className="flex-1 bg-[#121417] border border-[#1F2328] rounded-[2px] px-2.5 py-1.5 text-xs font-mono text-[#F0F3F6] placeholder:text-[#6E7681] focus:outline-none focus:border-[#38BDF8]"
+                    placeholder={`Ask about ${data.stock.name} revenue, debt, or prospects...`}
+                    className="flex-1 bg-[#090A0C] border border-[#1F2328] rounded px-3 py-2 text-xs text-white placeholder:text-[#6E7681] focus:outline-none focus:border-blue-500 transition"
                   />
                   <button
                     type="submit"
                     disabled={chatLoading || !chatInput.trim()}
-                    className="bg-[#1F2328] hover:bg-[#30363D] text-[#F0F3F6] px-3 py-1.5 rounded-[2px] font-mono text-xs font-bold border border-[#30363D] transition disabled:opacity-40 flex items-center space-x-1"
+                    className="bg-blue-600 hover:bg-blue-500 text-white p-2 rounded transition disabled:opacity-40"
+                    title="Send message"
                   >
-                    <span>EXEC</span>
-                    <CornerDownLeft className="w-3 h-3 text-[#38BDF8]" />
+                    <Send className="w-4 h-4" />
                   </button>
                 </form>
-                <div className="flex items-center justify-between text-[9px] font-mono text-[#8B949E] mt-1 px-1">
-                  <span>CMSA 2007 OBJECTIVE RESEARCH</span>
-                  <span>IMMUTABLE AUDIT LOG ACTIVE</span>
-                </div>
+                <p className="text-[10px] text-[#8B949E] text-center mt-1.5">
+                  Answers cite official Bursa Malaysia quarterly report disclosures (CMSA 2007 compliant)
+                </p>
               </div>
 
             </div>
@@ -1252,21 +1187,21 @@ export default function TerminalPage() {
 
       {/* 4. Universal Document Ingestion Modal */}
       {ingestModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-3 select-none">
-          <div className="bg-[#121417] border border-[#1F2328] rounded-[2px] max-w-lg w-full p-4 space-y-3 font-mono text-xs">
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-3">
+          <div className="bg-[#121417] border border-[#1F2328] rounded-lg max-w-lg w-full p-4 sm:p-5 space-y-3.5 text-xs shadow-2xl">
             
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-[#1F2328] pb-2">
+            <div className="flex items-center justify-between border-b border-[#1F2328] pb-2.5">
               <div className="flex items-center space-x-2">
-                <FileUp className="w-4 h-4 text-[#10B981]" />
-                <span className="font-bold text-[#F0F3F6]">INGEST_DISCLOSURE_FILING</span>
+                <FileUp className="w-4 h-4 text-emerald-400" />
+                <h3 className="font-bold text-sm text-white">Upload Financial Filing</h3>
               </div>
               <button
                 onClick={() => {
                   setIngestModalOpen(false);
                   setIngestFeedback(null);
                 }}
-                className="text-[#8B949E] hover:text-[#F0F3F6] p-0.5"
+                className="text-[#8B949E] hover:text-white p-1 rounded"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1274,38 +1209,38 @@ export default function TerminalPage() {
 
             {/* Target Stock Code */}
             <div className="space-y-1">
-              <label className="text-[10px] text-[#8B949E] uppercase block">Target Bursa Code</label>
+              <label className="text-[11px] font-medium text-[#8B949E] block">Bursa Stock Code</label>
               <div className="flex items-center space-x-2">
                 <input
                   type="text"
                   value={ingestStockCode}
                   onChange={(e) => setIngestStockCode(e.target.value)}
                   placeholder="e.g. 1155"
-                  className="bg-[#090A0C] border border-[#1F2328] rounded-[2px] px-2 py-1 text-xs text-[#F0F3F6] w-24 font-mono focus:outline-none focus:border-[#38BDF8]"
+                  className="bg-[#090A0C] border border-[#1F2328] rounded px-2.5 py-1.5 text-xs text-white w-24 font-mono focus:outline-none focus:border-blue-500"
                 />
-                <span className="text-[11px] text-[#8B949E] font-sans">
-                  Active Security: <span className="text-[#F0F3F6] font-bold">{data?.stock?.name || "Maybank"}</span> ({ingestStockCode}.KL)
+                <span className="text-xs text-[#8B949E]">
+                  Active: <strong className="text-white">{data?.stock?.name || "Maybank"}</strong> ({ingestStockCode}.KL)
                 </span>
               </div>
             </div>
 
             {/* Ingestion Mode Toggle */}
-            <div className="flex items-center space-x-1 border-b border-[#1F2328] pb-2 text-[11px]">
+            <div className="flex items-center space-x-1 border-b border-[#1F2328] pb-2 text-xs">
               <button
                 onClick={() => setIngestMode("file")}
-                className={`py-1 px-2.5 rounded-[2px] font-bold transition ${
-                  ingestMode === "file" ? "bg-[#1F2328] text-[#F0F3F6]" : "text-[#8B949E]"
+                className={`py-1 px-3 rounded font-medium transition ${
+                  ingestMode === "file" ? "bg-blue-600 text-white" : "text-[#8B949E] hover:text-white"
                 }`}
               >
-                FILE_UPLOAD (.PDF / .MD / .TXT)
+                Upload File (.PDF, .MD, .TXT)
               </button>
               <button
                 onClick={() => setIngestMode("text")}
-                className={`py-1 px-2.5 rounded-[2px] font-bold transition ${
-                  ingestMode === "text" ? "bg-[#1F2328] text-[#F0F3F6]" : "text-[#8B949E]"
+                className={`py-1 px-3 rounded font-medium transition ${
+                  ingestMode === "text" ? "bg-blue-600 text-white" : "text-[#8B949E] hover:text-white"
                 }`}
               >
-                PASTE_FILING_TEXT
+                Paste Report Text
               </button>
             </div>
 
@@ -1313,17 +1248,17 @@ export default function TerminalPage() {
             {ingestMode === "file" && (
               <div className="space-y-2">
                 <div
-                  className="border border-dashed border-[#1F2328] hover:border-[#38BDF8] p-4 text-center cursor-pointer transition bg-[#090A0C] rounded-[2px]"
+                  className="border border-dashed border-[#1F2328] hover:border-blue-500 p-5 text-center cursor-pointer transition bg-[#090A0C] rounded"
                   onClick={() => document.getElementById("report-file-input")?.click()}
                 >
-                  <Upload className="w-6 h-6 text-[#8B949E] mx-auto mb-1.5" />
-                  <p className="text-xs font-bold text-[#F0F3F6]">
-                    {ingestFile ? ingestFile.name : "CLICK TO BROWSE OR DRAG DISCLOSURE FILE"}
+                  <Upload className="w-7 h-7 text-[#8B949E] mx-auto mb-2" />
+                  <p className="text-xs font-semibold text-white">
+                    {ingestFile ? ingestFile.name : "Click to select or drag & drop a quarterly report"}
                   </p>
-                  <p className="text-[10px] text-[#8B949E] mt-0.5">Supports Bursa PDF Quarterly Reports, Markdown, and Text</p>
+                  <p className="text-[10px] text-[#8B949E] mt-1">Supports Bursa Quarterly PDF reports, Markdown, and Text</p>
                   {ingestFile && (
-                    <span className="inline-block mt-2 text-[10px] bg-[#16191D] text-[#10B981] px-1.5 py-0.5 border border-[#1F2328] rounded-[2px]">
-                      {(ingestFile.size / 1024).toFixed(1)} KB READY FOR RAG INGESTION
+                    <span className="inline-block mt-2 text-[10px] bg-emerald-950/60 text-emerald-400 px-2 py-0.5 rounded border border-emerald-800">
+                      {(ingestFile.size / 1024).toFixed(1)} KB ready for indexing
                     </span>
                   )}
                 </div>
@@ -1344,25 +1279,25 @@ export default function TerminalPage() {
             {/* Text Paste Area */}
             {ingestMode === "text" && (
               <div className="space-y-1">
-                <label className="text-[10px] text-[#8B949E] uppercase block">Raw Markdown or Note Text</label>
+                <label className="text-[11px] font-medium text-[#8B949E] block">Paste Financial Disclosure Text</label>
                 <textarea
                   rows={6}
                   value={ingestText}
                   onChange={(e) => setIngestText(e.target.value)}
                   placeholder="Paste statement tables or Part B explanatory notes..."
-                  className="w-full bg-[#090A0C] border border-[#1F2328] rounded-[2px] p-2 text-[11px] font-mono text-[#F0F3F6] focus:outline-none focus:border-[#38BDF8]"
+                  className="w-full bg-[#090A0C] border border-[#1F2328] rounded p-2.5 text-xs text-white focus:outline-none focus:border-blue-500"
                 />
               </div>
             )}
 
-            {/* Status Feedback */}
+            {/* Feedback Message */}
             {ingestFeedback && (
-              <div className={`p-2 rounded-[2px] text-xs border ${
+              <div className={`p-2.5 rounded text-xs border ${
                 ingestFeedback.success
-                  ? "bg-[#090A0C] border-[#10B981] text-[#10B981]"
-                  : "bg-[#090A0C] border-[#F85149] text-[#F85149]"
+                  ? "bg-emerald-950/40 border-emerald-800 text-emerald-300"
+                  : "bg-rose-950/40 border-rose-800 text-rose-300"
               }`}>
-                <p className="font-bold">{ingestFeedback.message}</p>
+                <p className="font-semibold">{ingestFeedback.message}</p>
                 {ingestFeedback.details && (
                   <p className="text-[10px] text-[#8B949E] mt-0.5">
                     Indexed {ingestFeedback.details.sections_indexed} sections and {ingestFeedback.details.tables_extracted} tables into RAG.
@@ -1379,25 +1314,25 @@ export default function TerminalPage() {
                   setIngestModalOpen(false);
                   setIngestFeedback(null);
                 }}
-                className="px-2.5 py-1 text-xs text-[#8B949E] hover:text-[#F0F3F6] hover:bg-[#1F2328] rounded-[2px] transition"
+                className="px-3 py-1.5 text-xs text-[#8B949E] hover:text-white rounded hover:bg-[#1F2328] transition"
               >
-                CANCEL
+                Cancel
               </button>
               <button
                 type="button"
                 onClick={handleIngestReport}
                 disabled={ingestLoading || (ingestMode === "file" && !ingestFile) || (ingestMode === "text" && !ingestText.trim())}
-                className="bg-[#1F2328] hover:bg-[#30363D] text-[#10B981] px-3 py-1 rounded-[2px] text-xs font-bold border border-[#30363D] transition disabled:opacity-40 flex items-center space-x-1.5"
+                className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-1.5 rounded text-xs font-semibold transition disabled:opacity-40 flex items-center space-x-1.5"
               >
                 {ingestLoading ? (
                   <>
-                    <RefreshCw className="w-3 h-3 animate-spin" />
-                    <span>INDEXING...</span>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Indexing...</span>
                   </>
                 ) : (
                   <>
-                    <Database className="w-3 h-3" />
-                    <span>INGEST_INDEX</span>
+                    <Database className="w-3.5 h-3.5" />
+                    <span>Index Report</span>
                   </>
                 )}
               </button>
@@ -1407,11 +1342,11 @@ export default function TerminalPage() {
         </div>
       )}
 
-      {/* 5. Minimal Institutional Footer */}
-      <footer className="bg-[#121417] border-t border-[#1F2328] py-2 px-3 sm:px-4 text-[10px] font-mono text-[#8B949E] select-none">
-        <div className="w-full max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-1">
-          <p>© 2026 BURSA_INTELLIGENCE // GROUNDED IN PUBLIC QUARTERLY FILINGS</p>
-          <p>CMSA 2007 NON-ADVISORY COMPLIANT // 4-STAGE RAG (AST + CHROMADB + BM25 + FLASHRANK)</p>
+      {/* 5. Clean Footer */}
+      <footer className="bg-[#121417] border-t border-[#1F2328] py-2.5 px-3 sm:px-6 text-xs text-[#8B949E]">
+        <div className="w-full max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-1 text-[11px]">
+          <p>© 2026 Bursa Intelligence. Financial data grounded in official Bursa Malaysia filings.</p>
+          <p>CMSA 2007 Compliant • 4-Stage RAG (AST + ChromaDB + BM25 + FlashRank)</p>
         </div>
       </footer>
 

@@ -2,13 +2,15 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Bursa Intelligence - Real-Time Market Quotes, Financial Reports & DCF Valuation",
-  description: "Bursa Malaysia equity research, real-time quotes, regulatory disclosures, and financial analytics.",
+  title: "Bursa Intelligence - Financial Research, Live Quotes & Analysis",
+  description: "Institutional and retail financial intelligence for Bursa Malaysia equities with automated filing analysis.",
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0b0f19",
-  colorScheme: "dark",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  themeColor: "#090a0c",
 };
 
 export default function RootLayout({
@@ -19,9 +21,10 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
         <meta name="color-scheme" content="dark" />
       </head>
-      <body className="min-h-screen bg-[#0b0f19] text-slate-100 antialiased selection:bg-blue-600/30 selection:text-blue-200">
+      <body className="min-h-screen bg-[#090A0C] text-[#F0F3F6] antialiased selection:bg-[#38BDF8]/20 selection:text-[#38BDF8]">
         {children}
       </body>
     </html>
