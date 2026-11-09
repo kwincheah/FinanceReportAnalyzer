@@ -280,10 +280,17 @@ export default function App() {
   const [ingestLoading, setIngestLoading] = useState(false);
   const [ingestFeedback, setIngestFeedback] = useState<{ success: boolean; message: string; details?: any } | null>(null);
 
-  // Focus confirm button when popup appears
+  // Focus confirm button when popup appears & listen for Escape key
   useEffect(() => {
     if (assistantOpen) {
       setTimeout(() => confirmButtonRef.current?.focus(), 50);
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === "Escape") {
+          setAssistantOpen(false);
+        }
+      };
+      window.addEventListener("keydown", handleKeyDown);
+      return () => window.removeEventListener("keydown", handleKeyDown);
     }
   }, [assistantOpen]);
 
@@ -540,45 +547,64 @@ export default function App() {
 
       {/* Start Page Header with Theme Switch */}
       {view === "home" && (
-        <header className="w-full max-w-4xl mx-auto px-4 sm:px-6 pt-4 pb-0 flex items-center justify-between">
-          <span className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-[#8B949E]">
-            Bursa Intelligence
-          </span>
+        <header className="w-full max-w-4xl mx-auto px-4 sm:px-6 pt-5 pb-0 flex items-center justify-between">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-6 h-6 rounded-md bg-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-sm">
+              B
+            </div>
+            <span className="text-xs font-bold tracking-tight text-slate-800 dark:text-white">
+              Bursa Intelligence
+            </span>
+            <span className="hidden sm:inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span>Live Market Data</span>
+            </span>
+          </div>
           <ThemeSwitch theme={theme} onToggle={toggleTheme} />
         </header>
       )}
 
       {/* 2. VIEW 1: CLEAN MINIMAL START PAGE */}
       {view === "home" && (
-        <main className="flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-12 flex flex-col items-center justify-center space-y-8">
+        <main className="flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-14 flex flex-col items-center justify-center space-y-9">
           
           {/* Minimalist Hero */}
-          <div className="text-center space-y-2 max-w-xl w-full">
+          <div className="text-center space-y-2.5 max-w-xl w-full">
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-slate-900 dark:text-white tracking-tight">
               Bursa Market Research
             </h1>
             <p className="text-slate-600 dark:text-[#8B949E] text-xs sm:text-sm leading-relaxed max-w-md mx-auto">
-              Search any company or ticker code to review quarterly earnings, financial statements, and explore insights.
+              Search any company or ticker code to review quarterly earnings, financial disclosures, and AI-grounded insights.
             </p>
           </div>
 
           {/* Clean Search Box - NO POPUP WHILE TYPING; ONLY OPENS AFTER USER PRESSES ENTER */}
           <div className="w-full max-w-xl relative">
             <form onSubmit={handleSearchSubmit} className="relative">
-              <div className="relative flex items-center shadow-lg rounded-lg">
+              <div className="relative flex items-center shadow-md hover:shadow-lg transition-shadow rounded-xl">
                 <Search className="w-4 h-4 sm:w-5 sm:h-5 absolute left-3.5 text-slate-400 dark:text-[#8B949E]" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Enter company or question (e.g. 'analyse report for Tenaga')..."
-                  className="w-full bg-white dark:bg-[#121417] border border-slate-200 dark:border-[#1F2328] hover:border-slate-300 dark:hover:border-[#30363D] focus:border-blue-500 rounded-lg pl-10 pr-24 py-3 sm:py-3.5 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-[#6E7681] focus:outline-none transition shadow-sm"
+                  placeholder="Enter company or query (e.g. 'analyse report for Tenaga')..."
+                  className="w-full bg-white dark:bg-[#121417] border border-slate-200 dark:border-[#1F2328] hover:border-slate-300 dark:hover:border-[#30363D] focus:border-blue-500 dark:focus:border-blue-500 rounded-xl pl-11 pr-28 py-3.5 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-[#6E7681] focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition"
                   autoFocus
                 />
+                {searchQuery.trim() && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-24 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1"
+                    title="Clear"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
                 <button
                   type="submit"
                   disabled={loading || !searchQuery.trim()}
-                  className="absolute right-1.5 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded text-xs font-semibold disabled:opacity-40 flex items-center space-x-1 transition shadow-sm"
+                  className="absolute right-1.5 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-xs font-semibold disabled:opacity-40 flex items-center space-x-1.5 transition shadow-sm active:scale-95"
                 >
                   <span>Search</span>
                   <ChevronRight className="w-3.5 h-3.5" />
@@ -586,35 +612,41 @@ export default function App() {
               </div>
             </form>
             <p className="text-[11px] text-slate-500 dark:text-[#8B949E] mt-2 text-center">
-              Press <kbd className="px-1.5 py-0.5 bg-slate-100 dark:bg-[#16191D] border border-slate-200 dark:border-[#1F2328] rounded text-[10px] text-slate-700 dark:text-white">Enter</kbd> to confirm and search
+              Press <kbd className="px-1.5 py-0.5 bg-slate-100 dark:bg-[#16191D] border border-slate-200 dark:border-[#1F2328] rounded text-[10px] font-mono text-slate-700 dark:text-slate-300 shadow-2xs">Enter</kbd> to confirm query
             </p>
           </div>
 
           {/* Popular Equities Grid */}
-          <div className="w-full space-y-2">
-            <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#1F2328] pb-1.5">
-              <span className="text-xs font-semibold text-slate-900 dark:text-white">Popular Companies</span>
-              <span className="text-[11px] text-slate-500 dark:text-[#8B949E]">Bursa Malaysia</span>
+          <div className="w-full space-y-2.5">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#1F2328] pb-2">
+              <span className="text-xs font-semibold text-slate-900 dark:text-white">Popular Bursa Equities</span>
+              <span className="text-[11px] text-slate-500 dark:text-[#8B949E]">KLSE Active</span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               {POPULAR_COMPANIES.map((company) => (
                 <button
                   key={company.code}
                   onClick={() => loadStockData(company.code)}
                   disabled={loading}
-                  className="bg-white dark:bg-[#121417] hover:bg-slate-50 dark:hover:bg-[#16191D] p-3 rounded border border-slate-200 dark:border-[#1F2328] hover:border-slate-300 dark:hover:border-slate-700 text-left transition flex flex-col justify-between group active:scale-[0.99] shadow-sm"
+                  className="bg-white dark:bg-[#121417] hover:bg-slate-50 dark:hover:bg-[#16191D] p-3.5 rounded-xl border border-slate-200 dark:border-[#1F2328] hover:border-blue-500/50 dark:hover:border-blue-500/50 text-left transition-all duration-150 flex flex-col justify-between group active:scale-[0.98] shadow-xs hover:shadow-sm"
                 >
-                  <div className="flex items-center justify-between w-full mb-1">
-                    <span className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">
-                      {company.name}
-                    </span>
-                    <span className={`text-[11px] font-semibold tabular-nums ${company.positive ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
-                      {company.positive ? "+" : ""}{company.change.toFixed(2)}%
-                    </span>
+                  <div>
+                    <div className="flex items-center justify-between w-full mb-1">
+                      <span className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                        {company.name}
+                      </span>
+                      <span className={`text-[11px] font-semibold tabular-nums ${company.positive ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
+                        {company.positive ? "+" : ""}{company.change.toFixed(2)}%
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 line-clamp-1 mb-2">
+                      {company.sector}
+                    </p>
                   </div>
-                  <div className="flex items-baseline justify-between mt-1">
-                    <span className="text-[11px] text-slate-500 dark:text-[#8B949E]">
+
+                  <div className="flex items-baseline justify-between pt-1 border-t border-slate-100 dark:border-[#1F2328]">
+                    <span className="text-[10px] text-slate-500 dark:text-[#8B949E] font-mono">
                       {company.ticker}
                     </span>
                     <span className="text-xs font-bold text-slate-900 dark:text-white tabular-nums">
@@ -627,29 +659,29 @@ export default function App() {
           </div>
 
           {/* Market Overview Benchmarks */}
-          <div className="w-full space-y-2">
-            <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#1F2328] pb-1.5">
-              <span className="text-xs font-semibold text-slate-900 dark:text-white">Market Overview</span>
-              <span className="text-[11px] text-slate-500 dark:text-[#8B949E]">Live Benchmarks</span>
+          <div className="w-full space-y-2.5">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#1F2328] pb-2">
+              <span className="text-xs font-semibold text-slate-900 dark:text-white">Market Benchmarks</span>
+              <span className="text-[11px] text-slate-500 dark:text-[#8B949E]">Real-Time Indicators</span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5 text-xs">
-              <div className="bg-white dark:bg-[#121417] p-3 rounded border border-slate-200 dark:border-[#1F2328] shadow-sm">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+              <div className="bg-white dark:bg-[#121417] p-3.5 rounded-xl border border-slate-200 dark:border-[#1F2328] shadow-xs">
                 <span className="text-[11px] text-slate-500 dark:text-[#8B949E] block mb-0.5">FBM KLCI Index</span>
                 <span className="text-sm font-bold text-slate-900 dark:text-white tabular-nums">1,624.18</span>
                 <span className="text-[11px] text-emerald-600 dark:text-emerald-400 block font-medium mt-0.5">+5.12 (+0.32%)</span>
               </div>
-              <div className="bg-white dark:bg-[#121417] p-3 rounded border border-slate-200 dark:border-[#1F2328] shadow-sm">
+              <div className="bg-white dark:bg-[#121417] p-3.5 rounded-xl border border-slate-200 dark:border-[#1F2328] shadow-xs">
                 <span className="text-[11px] text-slate-500 dark:text-[#8B949E] block mb-0.5">USD / MYR</span>
                 <span className="text-sm font-bold text-slate-900 dark:text-white tabular-nums">4.4125</span>
                 <span className="text-[11px] text-emerald-600 dark:text-emerald-400 block font-medium mt-0.5">-0.0065 (-0.15%)</span>
               </div>
-              <div className="bg-white dark:bg-[#121417] p-3 rounded border border-slate-200 dark:border-[#1F2328] shadow-sm">
+              <div className="bg-white dark:bg-[#121417] p-3.5 rounded-xl border border-slate-200 dark:border-[#1F2328] shadow-xs">
                 <span className="text-[11px] text-slate-500 dark:text-[#8B949E] block mb-0.5">Brent Crude</span>
                 <span className="text-sm font-bold text-slate-900 dark:text-white tabular-nums">$73.87</span>
                 <span className="text-[11px] text-emerald-600 dark:text-emerald-400 block font-medium mt-0.5">+$0.48 (+0.65%)</span>
               </div>
-              <div className="bg-white dark:bg-[#121417] p-3 rounded border border-slate-200 dark:border-[#1F2328] shadow-sm">
+              <div className="bg-white dark:bg-[#121417] p-3.5 rounded-xl border border-slate-200 dark:border-[#1F2328] shadow-xs">
                 <span className="text-[11px] text-slate-500 dark:text-[#8B949E] block mb-0.5">BNM OPR Rate</span>
                 <span className="text-sm font-bold text-slate-900 dark:text-white tabular-nums">3.00%</span>
                 <span className="text-[11px] text-slate-500 dark:text-[#8B949E] block font-medium mt-0.5">Neutral Policy</span>
@@ -661,131 +693,148 @@ export default function App() {
           {/* USER CONFIRMATION POPUP: ONLY TRIGGERS ONCE USER FINISHES INPUT AND ENTERS */}
           {/* ========================================================================= */}
           {assistantOpen && (
-            <div className="fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 w-[92%] max-w-lg z-40 bg-white dark:bg-[#12161f] border border-slate-300 dark:border-blue-500/50 shadow-2xl rounded-xl p-4 text-xs animate-in fade-in slide-in-from-bottom-3 duration-200">
-              
-              {/* Header */}
-              <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#1F2328] pb-2 mb-2.5">
-                <div className="flex items-center space-x-2">
-                  <div className="w-5 h-5 rounded-full bg-blue-600/10 dark:bg-blue-600/20 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-                    <Sparkles className="w-3 h-3" />
-                  </div>
-                  <span className="font-bold text-slate-900 dark:text-white text-xs">Confirm Target & Query</span>
-                </div>
-                <button
-                  onClick={() => setAssistantOpen(false)}
-                  className="text-slate-500 dark:text-[#8B949E] hover:text-slate-900 dark:hover:text-white p-1 rounded hover:bg-slate-100 dark:hover:bg-[#1F2328] transition"
-                  title="Close"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* Case 1: Company Matched */}
-              {parsedIntent.company ? (
-                <div className="space-y-3">
-                  <div className="bg-slate-50 dark:bg-[#090c14] border border-slate-200 dark:border-slate-800 p-3 rounded-lg">
-                    <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-[#8B949E] mb-1">
-                      <span>Target Company:</span>
-                      <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center space-x-1">
-                        <Check className="w-3 h-3" />
-                        <span>Identified</span>
-                      </span>
+            <div
+              className="fixed inset-0 z-50 bg-slate-900/50 dark:bg-black/70 backdrop-blur-xs flex items-end sm:items-center justify-center p-3 sm:p-4"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setAssistantOpen(false);
+              }}
+            >
+              <div className="w-full max-w-lg bg-white dark:bg-[#12161f] border border-slate-200 dark:border-slate-800 shadow-2xl rounded-2xl p-5 text-xs animate-in fade-in zoom-in-95 duration-150 space-y-4">
+                
+                {/* Header */}
+                <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#1F2328] pb-3">
+                  <div className="flex items-center space-x-2.5">
+                    <div className="w-6 h-6 rounded-lg bg-blue-600/10 dark:bg-blue-600/20 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                      <Sparkles className="w-3.5 h-3.5" />
                     </div>
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-slate-900 dark:text-white font-bold text-sm">
-                        {parsedIntent.company.name} ({parsedIntent.company.ticker})
-                      </span>
-                      <span className="text-blue-600 dark:text-blue-400 font-bold tabular-nums">
-                        RM {parsedIntent.company.price.toFixed(2)}
-                      </span>
+                    <div>
+                      <h3 className="font-bold text-slate-900 dark:text-white text-xs">Confirm Target & Query</h3>
+                      <p className="text-[10px] text-slate-500 dark:text-[#8B949E]">Review parameters before analyzing official filings</p>
                     </div>
-
-                    {parsedIntent.instruction ? (
-                      <div className="mt-2.5 pt-2 border-t border-slate-200 dark:border-slate-800 text-[11px]">
-                        <span className="text-slate-500 dark:text-[#8B949E] block mb-1">Your analytical request:</span>
-                        <div className="text-blue-900 dark:text-blue-300 bg-blue-50 dark:bg-[#141b28] p-2 rounded border border-blue-200 dark:border-blue-900/40 font-medium">
-                          &quot;{parsedIntent.instruction}&quot;
-                        </div>
-                      </div>
-                    ) : null}
                   </div>
-
-                  {/* Primary Action Button (Focused for instant Enter key submission) */}
-                  <button
-                    ref={confirmButtonRef}
-                    onClick={() => {
-                      const comp = parsedIntent.company!;
-                      loadStockData(comp.code, parsedIntent.instruction);
-                    }}
-                    className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 px-3 rounded-lg flex items-center justify-center space-x-2 transition text-xs shadow-md focus:ring-2 focus:ring-blue-400"
-                  >
-                    <span>
-                      {parsedIntent.instruction ? `Run Analysis on ${parsedIntent.company.name}` : `View ${parsedIntent.company.name} Financials`}
+                  <div className="flex items-center space-x-2">
+                    <span className="hidden sm:inline text-[10px] text-slate-400 dark:text-slate-500">
+                      <kbd className="px-1.5 py-0.5 bg-slate-100 dark:bg-[#16191D] border border-slate-200 dark:border-[#1F2328] rounded text-[10px] font-mono">Esc</kbd>
                     </span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
+                    <button
+                      onClick={() => setAssistantOpen(false)}
+                      className="text-slate-400 hover:text-slate-700 dark:hover:text-white p-1 rounded-md hover:bg-slate-100 dark:hover:bg-[#1F2328] transition"
+                      title="Close (Esc)"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
 
-                  {/* Quick Suggestions */}
-                  <div className="pt-2 border-t border-slate-200 dark:border-[#1F2328]">
-                    <span className="text-[10px] text-slate-500 dark:text-[#8B949E] block mb-1.5">Or choose a common topic:</span>
-                    <div className="flex flex-wrap gap-1.5">
-                      <button
-                        onClick={() => {
-                          const comp = parsedIntent.company!;
-                          loadStockData(comp.code, "Summarize revenue drivers and segment performance from the latest quarterly report.");
-                        }}
-                        className="bg-slate-100 dark:bg-[#16191D] hover:bg-slate-200 dark:hover:bg-[#1F2328] text-slate-700 dark:text-[#8B949E] hover:text-slate-900 dark:hover:text-white text-[11px] px-2 py-1 rounded border border-slate-200 dark:border-[#1F2328] transition"
-                      >
-                        Revenue & Margins
-                      </button>
-                      <button
-                        onClick={() => {
-                          const comp = parsedIntent.company!;
-                          loadStockData(comp.code, "What are the management's key operating risks and market outlook?");
-                        }}
-                        className="bg-slate-100 dark:bg-[#16191D] hover:bg-slate-200 dark:hover:bg-[#1F2328] text-slate-700 dark:text-[#8B949E] hover:text-slate-900 dark:hover:text-white text-[11px] px-2 py-1 rounded border border-slate-200 dark:border-[#1F2328] transition"
-                      >
-                        Operating Outlook
-                      </button>
-                      <button
-                        onClick={() => {
-                          const comp = parsedIntent.company!;
-                          loadStockData(comp.code, "Summarize total borrowings, gearing ratio, and cash position.");
-                        }}
-                        className="bg-slate-100 dark:bg-[#16191D] hover:bg-slate-200 dark:hover:bg-[#1F2328] text-slate-700 dark:text-[#8B949E] hover:text-slate-900 dark:hover:text-white text-[11px] px-2 py-1 rounded border border-slate-200 dark:border-[#1F2328] transition"
-                      >
-                        Debt & Cash
-                      </button>
+                {/* Case 1: Company Matched */}
+                {parsedIntent.company ? (
+                  <div className="space-y-3.5">
+                    <div className="bg-slate-50 dark:bg-[#090c14] border border-slate-200 dark:border-slate-800 p-3.5 rounded-xl space-y-2">
+                      <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-[#8B949E]">
+                        <span>Target Bursa Equity:</span>
+                        <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center space-x-1">
+                          <Check className="w-3 h-3" />
+                          <span>Identified</span>
+                        </span>
+                      </div>
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-slate-900 dark:text-white font-bold text-sm">
+                          {parsedIntent.company.name} ({parsedIntent.company.ticker})
+                        </span>
+                        <span className="text-blue-600 dark:text-blue-400 font-bold tabular-nums">
+                          RM {parsedIntent.company.price.toFixed(2)}
+                        </span>
+                      </div>
+
+                      {parsedIntent.instruction ? (
+                        <div className="pt-2 border-t border-slate-200 dark:border-slate-800 text-[11px]">
+                          <span className="text-slate-500 dark:text-[#8B949E] block mb-1">Your analytical request:</span>
+                          <div className="text-blue-900 dark:text-blue-300 bg-blue-50 dark:bg-[#141b28] p-2.5 rounded-lg border border-blue-200 dark:border-blue-900/40 font-medium leading-relaxed">
+                            &quot;{parsedIntent.instruction}&quot;
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+
+                    {/* Primary Action Button (Focused for instant Enter key submission) */}
+                    <button
+                      ref={confirmButtonRef}
+                      onClick={() => {
+                        const comp = parsedIntent.company!;
+                        loadStockData(comp.code, parsedIntent.instruction);
+                      }}
+                      className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center space-x-2 transition text-xs shadow-md focus:ring-2 focus:ring-blue-400 active:scale-[0.99]"
+                    >
+                      <span>
+                        {parsedIntent.instruction ? `Run Analysis on ${parsedIntent.company.name}` : `View ${parsedIntent.company.name} Financials`}
+                      </span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+
+                    {/* Quick Suggestions */}
+                    <div className="pt-2 border-t border-slate-200 dark:border-[#1F2328]">
+                      <span className="text-[10px] text-slate-500 dark:text-[#8B949E] block mb-1.5 font-medium">Or choose a focused research topic:</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        <button
+                          onClick={() => {
+                            const comp = parsedIntent.company!;
+                            loadStockData(comp.code, "Summarize revenue drivers and segment performance from the latest quarterly report.");
+                          }}
+                          className="bg-slate-100 dark:bg-[#16191D] hover:bg-slate-200 dark:hover:bg-[#1F2328] text-slate-700 dark:text-[#8B949E] hover:text-slate-900 dark:hover:text-white text-[11px] px-2.5 py-1 rounded-lg border border-slate-200 dark:border-[#1F2328] transition active:scale-95"
+                        >
+                          Revenue & Margins
+                        </button>
+                        <button
+                          onClick={() => {
+                            const comp = parsedIntent.company!;
+                            loadStockData(comp.code, "What are the management's key operating risks and market outlook?");
+                          }}
+                          className="bg-slate-100 dark:bg-[#16191D] hover:bg-slate-200 dark:hover:bg-[#1F2328] text-slate-700 dark:text-[#8B949E] hover:text-slate-900 dark:hover:text-white text-[11px] px-2.5 py-1 rounded-lg border border-slate-200 dark:border-[#1F2328] transition active:scale-95"
+                        >
+                          Operating Outlook
+                        </button>
+                        <button
+                          onClick={() => {
+                            const comp = parsedIntent.company!;
+                            loadStockData(comp.code, "Summarize total borrowings, gearing ratio, and cash position.");
+                          }}
+                          className="bg-slate-100 dark:bg-[#16191D] hover:bg-slate-200 dark:hover:bg-[#1F2328] text-slate-700 dark:text-[#8B949E] hover:text-slate-900 dark:hover:text-white text-[11px] px-2.5 py-1 rounded-lg border border-slate-200 dark:border-[#1F2328] transition active:scale-95"
+                        >
+                          Debt & Cash
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ) : (
-                /* Case 2: Ambiguous Query - Quick Company Selector */
-                <div className="space-y-2.5">
-                  <p className="text-slate-500 dark:text-[#8B949E] text-xs">
-                    Please select a company to run your query:
-                  </p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {POPULAR_COMPANIES.slice(0, 4).map((c) => (
-                      <button
-                        key={c.code}
-                        onClick={() => {
-                          const instruction = searchQuery.trim();
-                          loadStockData(c.code, instruction);
-                        }}
-                        className="bg-slate-50 dark:bg-[#090c14] hover:bg-slate-100 dark:hover:bg-[#16191D] text-left p-2.5 border border-slate-200 dark:border-slate-800 hover:border-blue-500 rounded-lg transition flex items-center justify-between"
-                      >
-                        <div>
-                          <span className="font-bold text-slate-900 dark:text-white block text-xs">{c.name}</span>
-                          <span className="text-[10px] text-slate-500 dark:text-[#8B949E]">{c.ticker}</span>
-                        </div>
-                        <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">Select →</span>
-                      </button>
-                    ))}
+                ) : (
+                  /* Case 2: Ambiguous Query - Quick Company Selector */
+                  <div className="space-y-3">
+                    <p className="text-slate-600 dark:text-[#8B949E] text-xs">
+                      Please select the Bursa company you wish to analyze:
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {POPULAR_COMPANIES.slice(0, 4).map((c) => (
+                        <button
+                          key={c.code}
+                          onClick={() => {
+                            const instruction = searchQuery.trim();
+                            loadStockData(c.code, instruction);
+                          }}
+                          className="bg-slate-50 dark:bg-[#090c14] hover:bg-slate-100 dark:hover:bg-[#16191D] text-left p-3 border border-slate-200 dark:border-slate-800 hover:border-blue-500 rounded-xl transition flex items-center justify-between group active:scale-[0.98]"
+                        >
+                          <div>
+                            <span className="font-bold text-slate-900 dark:text-white block text-xs group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                              {c.name}
+                            </span>
+                            <span className="text-[10px] text-slate-500 dark:text-[#8B949E] font-mono">{c.ticker}</span>
+                          </div>
+                          <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold">Select →</span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
+              </div>
             </div>
           )}
 
@@ -797,12 +846,12 @@ export default function App() {
         <main className="flex-1 w-full max-w-[1600px] mx-auto p-2 sm:p-4 space-y-3">
           
           {/* Mobile Tab Switcher (3 Tabs: Filings, Financials, Copilot) */}
-          <div className="lg:hidden bg-white dark:bg-[#121417] border border-slate-200 dark:border-[#1F2328] rounded p-1 grid grid-cols-3 gap-1 text-xs">
+          <div className="lg:hidden bg-white dark:bg-[#121417] border border-slate-200 dark:border-[#1F2328] rounded-xl p-1 grid grid-cols-3 gap-1 text-xs shadow-2xs">
             <button
               onClick={() => setActiveTab("filings")}
-              className={`py-1.5 px-2 rounded font-semibold transition text-center flex items-center justify-center space-x-1 ${
+              className={`py-2 px-2 rounded-lg font-semibold transition text-center flex items-center justify-center space-x-1.5 ${
                 activeTab === "filings"
-                  ? "bg-blue-600 text-white"
+                  ? "bg-blue-600 text-white shadow-xs"
                   : "text-slate-600 dark:text-[#8B949E] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1F2328]"
               }`}
             >
@@ -811,9 +860,9 @@ export default function App() {
             </button>
             <button
               onClick={() => setActiveTab("overview")}
-              className={`py-1.5 px-2 rounded font-semibold transition text-center flex items-center justify-center space-x-1 ${
+              className={`py-2 px-2 rounded-lg font-semibold transition text-center flex items-center justify-center space-x-1.5 ${
                 activeTab === "overview"
-                  ? "bg-blue-600 text-white"
+                  ? "bg-blue-600 text-white shadow-xs"
                   : "text-slate-600 dark:text-[#8B949E] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1F2328]"
               }`}
             >
@@ -822,9 +871,9 @@ export default function App() {
             </button>
             <button
               onClick={() => setActiveTab("chat")}
-              className={`py-1.5 px-2 rounded font-semibold transition text-center flex items-center justify-center space-x-1 ${
+              className={`py-2 px-2 rounded-lg font-semibold transition text-center flex items-center justify-center space-x-1.5 ${
                 activeTab === "chat"
-                  ? "bg-blue-600 text-white"
+                  ? "bg-blue-600 text-white shadow-xs"
                   : "text-slate-600 dark:text-[#8B949E] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1F2328]"
               }`}
             >
@@ -834,19 +883,24 @@ export default function App() {
           </div>
 
           {/* Stock Header Banner */}
-          <div className="bg-white dark:bg-[#121417] border border-slate-200 dark:border-[#1F2328] rounded-lg p-3 sm:p-4 flex flex-wrap items-center justify-between gap-3 text-xs">
-            <div className="flex items-center space-x-3">
+          <div className="bg-white dark:bg-[#121417] border border-slate-200 dark:border-[#1F2328] rounded-xl p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 text-xs shadow-xs">
+            <div className="flex items-center space-x-3.5">
               <div>
-                <div className="flex items-center space-x-2">
-                  <h1 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+                <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                  <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
                     {data.stock.name}
                   </h1>
-                  <span className="bg-slate-100 dark:bg-[#16191D] text-slate-700 dark:text-[#8B949E] text-xs px-2 py-0.5 rounded border border-slate-200 dark:border-[#1F2328] font-mono">
+                  <span className="bg-slate-100 dark:bg-[#16191D] text-slate-700 dark:text-[#8B949E] text-xs px-2 py-0.5 rounded-md border border-slate-200 dark:border-[#1F2328] font-mono">
                     {data.stock.ticker}
                   </span>
+                  {POPULAR_COMPANIES.find(c => c.code === (data.stock.code || activeCode))?.sector && (
+                    <span className="text-[10px] text-slate-500 dark:text-[#8B949E] px-2 py-0.5 rounded-full bg-slate-50 dark:bg-[#090A0C] border border-slate-200 dark:border-[#1F2328]">
+                      {POPULAR_COMPANIES.find(c => c.code === (data.stock.code || activeCode))?.sector}
+                    </span>
+                  )}
                 </div>
-                <div className="flex items-baseline space-x-2 mt-0.5">
-                  <span className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tabular-nums">
+                <div className="flex items-baseline space-x-2.5 mt-1">
+                  <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tabular-nums tracking-tight">
                     RM {data.stock.price.toFixed(2)}
                   </span>
                   <span className={`text-xs font-semibold tabular-nums flex items-center ${isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
@@ -858,28 +912,28 @@ export default function App() {
             </div>
 
             {/* Metrics Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 w-full sm:w-auto text-xs">
-              <div className="bg-slate-50 dark:bg-[#090A0C] p-2 rounded border border-slate-200 dark:border-[#1F2328]">
-                <span className="text-[10px] text-slate-500 dark:text-[#8B949E] block">Market Cap</span>
-                <span className="text-slate-900 dark:text-white font-semibold tabular-nums">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 w-full sm:w-auto text-xs">
+              <div className="bg-slate-50 dark:bg-[#090A0C] p-2.5 sm:p-3 rounded-xl border border-slate-200 dark:border-[#1F2328] min-w-[100px]">
+                <span className="text-[10px] text-slate-500 dark:text-[#8B949E] block mb-0.5">Market Cap</span>
+                <span className="text-slate-900 dark:text-white font-bold tabular-nums text-sm">
                   RM {data.stock.market_cap ? (data.stock.market_cap / 1_000_000_000).toFixed(1) + "B" : "122.5B"}
                 </span>
               </div>
-              <div className="bg-slate-50 dark:bg-[#090A0C] p-2 rounded border border-slate-200 dark:border-[#1F2328]">
-                <span className="text-[10px] text-slate-500 dark:text-[#8B949E] block">P/E Ratio</span>
-                <span className="text-slate-900 dark:text-white font-semibold tabular-nums">
+              <div className="bg-slate-50 dark:bg-[#090A0C] p-2.5 sm:p-3 rounded-xl border border-slate-200 dark:border-[#1F2328] min-w-[100px]">
+                <span className="text-[10px] text-slate-500 dark:text-[#8B949E] block mb-0.5">P/E Ratio</span>
+                <span className="text-slate-900 dark:text-white font-bold tabular-nums text-sm">
                   {data.metrics.annualized_pe ? `${data.metrics.annualized_pe}x` : "12.8x"}
                 </span>
               </div>
-              <div className="bg-slate-50 dark:bg-[#090A0C] p-2 rounded border border-slate-200 dark:border-[#1F2328]">
-                <span className="text-[10px] text-slate-500 dark:text-[#8B949E] block">Operating Margin</span>
-                <span className="text-emerald-600 dark:text-emerald-400 font-semibold tabular-nums">
+              <div className="bg-slate-50 dark:bg-[#090A0C] p-2.5 sm:p-3 rounded-xl border border-slate-200 dark:border-[#1F2328] min-w-[100px]">
+                <span className="text-[10px] text-slate-500 dark:text-[#8B949E] block mb-0.5">Operating Margin</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-bold tabular-nums text-sm">
                   {data.metrics.net_margin_pct ? `${data.metrics.net_margin_pct}%` : "32.6%"}
                 </span>
               </div>
-              <div className="bg-slate-50 dark:bg-[#090A0C] p-2 rounded border border-slate-200 dark:border-[#1F2328]">
-                <span className="text-[10px] text-slate-500 dark:text-[#8B949E] block">Gearing Ratio</span>
-                <span className="text-slate-900 dark:text-white font-semibold tabular-nums">
+              <div className="bg-slate-50 dark:bg-[#090A0C] p-2.5 sm:p-3 rounded-xl border border-slate-200 dark:border-[#1F2328] min-w-[100px]">
+                <span className="text-[10px] text-slate-500 dark:text-[#8B949E] block mb-0.5">Gearing Ratio</span>
+                <span className="text-slate-900 dark:text-white font-bold tabular-nums text-sm">
                   {data.metrics.gearing_ratio ? `${data.metrics.gearing_ratio}x` : "0.45x"}
                 </span>
               </div>
@@ -887,16 +941,16 @@ export default function App() {
           </div>
 
           {/* 3-Column Responsive Workspace */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-start">
             
             {/* 1. LEFT COLUMN: Financial Reports & Public Disclosures List */}
             <div className={`lg:col-span-3 space-y-2.5 ${activeTab === "filings" ? "block" : "hidden lg:block"}`}>
-              <div className="bg-white dark:bg-[#121417] border border-slate-200 dark:border-[#1F2328] rounded-lg p-3 space-y-2.5">
+              <div className="bg-white dark:bg-[#121417] border border-slate-200 dark:border-[#1F2328] rounded-xl p-3.5 space-y-3 shadow-xs">
                 
                 {/* Header */}
-                <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#1F2328] pb-2">
+                <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#1F2328] pb-2.5">
                   <div className="flex items-center space-x-2">
-                    <FileText className="w-4 h-4 text-blue-500 dark:text-blue-400" />
+                    <FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                     <div>
                       <h3 className="font-semibold text-xs text-slate-900 dark:text-white">Financial Reports</h3>
                       <p className="text-[10px] text-slate-500 dark:text-[#8B949E]">Official Disclosures</p>
@@ -908,12 +962,12 @@ export default function App() {
                 </div>
 
                 {/* Filter Tabs */}
-                <div className="flex items-center space-x-1 bg-slate-100 dark:bg-[#090A0C] border border-slate-200 dark:border-[#1F2328] p-0.5 rounded text-[11px]">
+                <div className="flex items-center space-x-1 bg-slate-100 dark:bg-[#090A0C] border border-slate-200 dark:border-[#1F2328] p-0.5 rounded-lg text-[11px]">
                   <button
                     onClick={() => setFilingsFilter("all")}
-                    className={`flex-1 py-1 rounded font-medium transition text-center ${
+                    className={`flex-1 py-1 rounded-md font-medium transition text-center ${
                       filingsFilter === "all"
-                        ? "bg-blue-600 text-white shadow-sm"
+                        ? "bg-blue-600 text-white shadow-2xs"
                         : "text-slate-600 dark:text-[#8B949E] hover:text-slate-900 dark:hover:text-white"
                     }`}
                   >
@@ -921,9 +975,9 @@ export default function App() {
                   </button>
                   <button
                     onClick={() => setFilingsFilter("quarterly")}
-                    className={`flex-1 py-1 rounded font-medium transition text-center ${
+                    className={`flex-1 py-1 rounded-md font-medium transition text-center ${
                       filingsFilter === "quarterly"
-                        ? "bg-blue-600 text-white shadow-sm"
+                        ? "bg-blue-600 text-white shadow-2xs"
                         : "text-slate-600 dark:text-[#8B949E] hover:text-slate-900 dark:hover:text-white"
                     }`}
                   >
@@ -931,9 +985,9 @@ export default function App() {
                   </button>
                   <button
                     onClick={() => setFilingsFilter("annual")}
-                    className={`flex-1 py-1 rounded font-medium transition text-center ${
+                    className={`flex-1 py-1 rounded-md font-medium transition text-center ${
                       filingsFilter === "annual"
-                        ? "bg-blue-600 text-white shadow-sm"
+                        ? "bg-blue-600 text-white shadow-2xs"
                         : "text-slate-600 dark:text-[#8B949E] hover:text-slate-900 dark:hover:text-white"
                     }`}
                   >
@@ -955,20 +1009,20 @@ export default function App() {
                         <div
                           key={f.id}
                           onClick={() => setSelectedFiling(f)}
-                          className={`p-2.5 rounded border transition cursor-pointer text-left ${
+                          className={`p-3 rounded-xl border transition cursor-pointer text-left ${
                             isSelected
-                              ? "bg-blue-50/70 dark:bg-[#161d28] border-blue-500/70 shadow-sm"
-                              : "bg-slate-50 dark:bg-[#090A0C] border-slate-200 dark:border-[#1F2328] hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-100/70 dark:hover:bg-[#12161f]"
+                              ? "bg-blue-50/80 dark:bg-[#161d28] border-l-4 border-l-blue-600 dark:border-l-blue-400 border-t border-r border-b border-blue-200 dark:border-blue-900/60 shadow-xs"
+                              : "bg-slate-50/70 dark:bg-[#090A0C] border-slate-200 dark:border-[#1F2328] hover:border-blue-400/50 hover:bg-slate-100/70 dark:hover:bg-[#12161f]"
                           }`}
                         >
                           {/* Top Row: Period badge + Latest indicator + Type */}
                           <div className="flex items-center justify-between mb-1.5">
                             <div className="flex items-center space-x-1.5">
-                              <span className="text-xs font-bold text-slate-900 dark:text-white font-mono bg-slate-200/80 dark:bg-[#16191D] px-1.5 py-0.5 rounded border border-slate-300 dark:border-[#1F2328]">
+                              <span className="text-xs font-bold text-slate-900 dark:text-white font-mono bg-slate-200/80 dark:bg-[#16191D] px-2 py-0.5 rounded border border-slate-300 dark:border-[#1F2328]">
                                 {f.period}
                               </span>
                               {f.is_latest && (
-                                <span className="text-[10px] bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800/60 px-1.5 py-0.2 rounded font-semibold flex items-center">
+                                <span className="text-[10px] bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800/60 px-2 py-0.5 rounded-full font-semibold flex items-center">
                                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse mr-1"></span>
                                   Latest
                                 </span>
@@ -980,14 +1034,17 @@ export default function App() {
                           </div>
 
                           {/* Filing Title */}
-                          <p className="text-xs font-medium text-slate-800 dark:text-slate-200 line-clamp-2 mb-1.5 leading-snug">
+                          <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 line-clamp-2 mb-1.5 leading-snug">
                             {f.title}
                           </p>
 
                           {/* Period Ended & Release Date */}
                           <div className="text-[11px] text-slate-500 dark:text-[#8B949E] space-y-0.5 mb-2">
                             <div className="flex items-center justify-between">
-                              <span>Period Ended:</span>
+                              <span className="flex items-center space-x-1">
+                                <Calendar className="w-3 h-3 text-slate-400" />
+                                <span>Period Ended:</span>
+                              </span>
                               <span className="text-slate-700 dark:text-slate-300 font-mono">{f.period_ended}</span>
                             </div>
                             <div className="flex items-center justify-between">
@@ -997,7 +1054,7 @@ export default function App() {
                           </div>
 
                           {/* Financial Metric Badges + Quick Action */}
-                          <div className="flex items-center justify-between pt-1.5 border-t border-slate-200 dark:border-[#1F2328] text-[11px]">
+                          <div className="flex items-center justify-between pt-2 border-t border-slate-200/80 dark:border-[#1F2328] text-[11px]">
                             <div className="text-[11px] text-slate-500 dark:text-[#8B949E]">
                               <span>Rev: <strong className="text-slate-900 dark:text-white font-mono">RM {f.revenue_m?.toLocaleString()}M</strong></span>
                               <span className="mx-1 text-slate-300 dark:text-[#484F58]">•</span>
@@ -1016,7 +1073,7 @@ export default function App() {
                                   data?.stock?.code || activeCode
                                 );
                               }}
-                              className="text-[10px] text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-white bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-600 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-900/50 hover:border-blue-300 dark:hover:border-blue-500 transition font-medium flex items-center space-x-1 disabled:opacity-50"
+                              className="text-[10px] text-blue-600 dark:text-blue-400 hover:text-white bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-600 dark:hover:bg-blue-600 px-2.5 py-1 rounded-lg border border-blue-200 dark:border-blue-900/50 hover:border-blue-600 transition font-medium flex items-center space-x-1 disabled:opacity-50 active:scale-95 shadow-2xs"
                               title="Ask Copilot about this filing"
                             >
                               {chatLoading && selectedFiling?.id === f.id ? (
@@ -1033,8 +1090,8 @@ export default function App() {
                 </div>
 
                 {/* Footer note in filings panel */}
-                <div className="pt-2 border-t border-slate-200 dark:border-[#1F2328] text-[10px] text-slate-500 dark:text-[#8B949E] flex items-center space-x-1">
-                  <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <div className="pt-2 border-t border-slate-200 dark:border-[#1F2328] text-[10px] text-slate-500 dark:text-[#8B949E] flex items-center space-x-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                   <span>Verified Bursa Malaysia public filings</span>
                 </div>
 
@@ -1042,15 +1099,15 @@ export default function App() {
             </div>
 
             {/* 2. CENTER COLUMN: Charts & Financial Statement Tables */}
-            <div className={`lg:col-span-5 space-y-3 ${activeTab === "overview" ? "block" : "hidden lg:block"}`}>
+            <div className={`lg:col-span-5 space-y-3.5 ${activeTab === "overview" ? "block" : "hidden lg:block"}`}>
               
               {/* Selected Filing Context Banner */}
               {selectedFiling && (
-                <div className="bg-blue-50/80 dark:bg-[#121417] border border-blue-200 dark:border-blue-900/40 rounded-lg p-2.5 flex items-center justify-between text-xs">
-                  <div className="flex items-center space-x-2">
+                <div className="bg-blue-50/80 dark:bg-[#121417] border border-blue-200 dark:border-blue-900/40 rounded-xl p-3 flex items-center justify-between text-xs shadow-2xs">
+                  <div className="flex items-center space-x-2.5">
                     <span className="w-2 h-2 rounded-full bg-blue-500 dark:bg-blue-400 animate-pulse"></span>
                     <span className="text-slate-500 dark:text-[#8B949E]">Viewing Filing:</span>
-                    <span className="text-slate-900 dark:text-white font-semibold">{selectedFiling.period}</span>
+                    <span className="text-slate-900 dark:text-white font-bold">{selectedFiling.period}</span>
                     <span className="text-slate-500 dark:text-[#8B949E] hidden sm:inline truncate max-w-[180px]">({selectedFiling.title})</span>
                   </div>
                   <button
@@ -1064,7 +1121,7 @@ export default function App() {
                         data?.stock?.code || activeCode
                       );
                     }}
-                    className="text-[11px] text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-white font-medium flex items-center space-x-1 shrink-0 ml-2 disabled:opacity-50"
+                    className="text-[11px] text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-white font-semibold flex items-center space-x-1 shrink-0 ml-2 disabled:opacity-50 active:scale-95 transition"
                   >
                     {chatLoading ? (
                       <RefreshCw className="w-3 h-3 animate-spin text-blue-500 dark:text-blue-400" />
@@ -1077,22 +1134,22 @@ export default function App() {
               )}
               
               {/* 1. Price Area Chart */}
-              <div className="bg-white dark:bg-[#121417] border border-slate-200 dark:border-[#1F2328] rounded-lg p-3 sm:p-4 space-y-2">
-                <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#1F2328] pb-2">
+              <div className="bg-white dark:bg-[#121417] border border-slate-200 dark:border-[#1F2328] rounded-xl p-4 sm:p-5 space-y-3 shadow-xs">
+                <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#1F2328] pb-2.5">
                   <div className="flex items-center space-x-2">
                     <LineChart className="w-4 h-4 text-blue-500 dark:text-blue-400" />
                     <span className="font-semibold text-xs text-slate-900 dark:text-white">Price History (MYR)</span>
                   </div>
 
                   {/* Interval Selector */}
-                  <div className="flex items-center space-x-1 bg-slate-100 dark:bg-[#090A0C] border border-slate-200 dark:border-[#1F2328] p-0.5 rounded text-xs">
+                  <div className="flex items-center space-x-1 bg-slate-100 dark:bg-[#090A0C] border border-slate-200 dark:border-[#1F2328] p-0.5 rounded-lg text-xs">
                     {(["1D", "5D", "1M", "6M", "1Y"] as const).map((interval) => (
                       <button
                         key={interval}
                         onClick={() => setSelectedInterval(interval)}
-                        className={`px-2 py-0.5 rounded font-medium transition ${
+                        className={`px-2.5 py-1 rounded-md font-medium transition ${
                           selectedInterval === interval
-                            ? "bg-blue-600 text-white shadow-sm"
+                            ? "bg-blue-600 text-white shadow-2xs"
                             : "text-slate-600 dark:text-[#8B949E] hover:text-slate-900 dark:hover:text-white"
                         }`}
                       >
@@ -1102,7 +1159,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="h-44 sm:h-52 w-full">
+                <div className="h-48 sm:h-56 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#1F2328" : "#E2E8F0"} />
@@ -1112,7 +1169,7 @@ export default function App() {
                         contentStyle={{
                           backgroundColor: isDark ? "#121417" : "#FFFFFF",
                           borderColor: isDark ? "#1F2328" : "#E2E8F0",
-                          borderRadius: "4px",
+                          borderRadius: "8px",
                           fontSize: "11px",
                           color: isDark ? "#F0F3F6" : "#0F172A",
                           boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)"
@@ -1123,7 +1180,7 @@ export default function App() {
                         type="monotone"
                         dataKey="price"
                         stroke={isDark ? "#38BDF8" : "#2563EB"}
-                        strokeWidth={1.5}
+                        strokeWidth={2}
                         fill="transparent"
                         isAnimationActive={false}
                       />
@@ -1133,8 +1190,8 @@ export default function App() {
               </div>
 
               {/* 2. Topline Revenue vs. Net Profit Progression */}
-              <div className="bg-white dark:bg-[#121417] border border-slate-200 dark:border-[#1F2328] rounded-lg p-3 sm:p-4 space-y-2">
-                <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#1F2328] pb-2">
+              <div className="bg-white dark:bg-[#121417] border border-slate-200 dark:border-[#1F2328] rounded-xl p-4 sm:p-5 space-y-3 shadow-xs">
+                <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#1F2328] pb-2.5">
                   <div className="flex items-center space-x-2">
                     <BarChart2 className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
                     <span className="font-semibold text-xs text-slate-900 dark:text-white">Quarterly Revenue vs. Profit (RM &apos;M)</span>
@@ -1142,7 +1199,7 @@ export default function App() {
                   <span className="text-[11px] text-slate-500 dark:text-[#8B949E]">Historical Progression</span>
                 </div>
 
-                <div className="h-32 sm:h-36 w-full">
+                <div className="h-36 sm:h-40 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={data.historical_quarters || [
@@ -1153,7 +1210,7 @@ export default function App() {
                         { quarter: "Q2 '26", revenue: 7200, profit: 2350 },
                       ]}
                       margin={{ top: 5, right: 5, left: -25, bottom: 0 }}
-                      barGap={4}
+                      barGap={5}
                     >
                       <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#1F2328" : "#E2E8F0"} />
                       <XAxis dataKey="quarter" stroke={isDark ? "#8B949E" : "#64748B"} tick={{ fontSize: 10 }} />
@@ -1162,7 +1219,7 @@ export default function App() {
                         contentStyle={{
                           backgroundColor: isDark ? "#121417" : "#FFFFFF",
                           borderColor: isDark ? "#1F2328" : "#E2E8F0",
-                          borderRadius: "4px",
+                          borderRadius: "8px",
                           fontSize: "11px",
                           color: isDark ? "#F0F3F6" : "#0F172A",
                           boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)"
@@ -1173,84 +1230,84 @@ export default function App() {
                         ]}
                       />
                       <Legend wrapperStyle={{ fontSize: "11px" }} />
-                      <Bar dataKey="revenue" name="Revenue" fill={isDark ? "#64748B" : "#94A3B8"} barSize={14} radius={[2, 2, 0, 0]} isAnimationActive={false} />
-                      <Bar dataKey="profit" name="Net Profit" fill={isDark ? "#10B981" : "#059669"} barSize={14} radius={[2, 2, 0, 0]} isAnimationActive={false} />
+                      <Bar dataKey="revenue" name="Revenue" fill={isDark ? "#64748B" : "#94A3B8"} barSize={16} radius={[3, 3, 0, 0]} isAnimationActive={false} />
+                      <Bar dataKey="profit" name="Net Profit" fill={isDark ? "#10B981" : "#059669"} barSize={16} radius={[3, 3, 0, 0]} isAnimationActive={false} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               </div>
 
               {/* 3. Financial Statement Excerpt Table */}
-              <div className="bg-white dark:bg-[#121417] border border-slate-200 dark:border-[#1F2328] rounded-lg p-3 sm:p-4 space-y-2">
-                <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#1F2328] pb-2">
+              <div className="bg-white dark:bg-[#121417] border border-slate-200 dark:border-[#1F2328] rounded-xl p-4 sm:p-5 space-y-3 shadow-xs">
+                <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#1F2328] pb-2.5">
                   <span className="font-semibold text-xs text-slate-900 dark:text-white">Financial Statement Summary</span>
                   <span className="text-[11px] text-slate-500 dark:text-[#8B949E]">RM &apos;000</span>
                 </div>
 
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto rounded-lg border border-slate-200/80 dark:border-[#1F2328]">
                   <table className="w-full text-left text-xs table-zebra">
                     <thead className="bg-slate-50 dark:bg-[#090A0C] text-slate-500 dark:text-[#8B949E] text-[11px] uppercase border-b border-slate-200 dark:border-[#1F2328]">
                       <tr>
-                        <th className="py-1.5 px-2.5 font-medium">Line Item</th>
-                        <th className="py-1.5 px-2.5 text-right font-medium">Current Qtr</th>
-                        <th className="py-1.5 px-2.5 text-right font-medium">Preceding Qtr</th>
-                        <th className="py-1.5 px-2.5 text-right font-medium">QoQ Change</th>
+                        <th className="py-2 px-3 font-semibold">Line Item</th>
+                        <th className="py-2 px-3 text-right font-semibold">Current Qtr</th>
+                        <th className="py-2 px-3 text-right font-semibold">Preceding Qtr</th>
+                        <th className="py-2 px-3 text-right font-semibold">QoQ Change</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 dark:divide-[#1F2328]">
                       <tr>
-                        <td className="py-1.5 px-2.5 text-slate-900 dark:text-white font-medium">Revenue</td>
-                        <td className="py-1.5 px-2.5 text-right tabular-nums text-slate-900 dark:text-white">
+                        <td className="py-2 px-3 text-slate-900 dark:text-white font-medium">Revenue</td>
+                        <td className="py-2 px-3 text-right tabular-nums text-slate-900 dark:text-white font-semibold">
                           {(data.financial_statement?.revenue || 7200000).toLocaleString()}
                         </td>
-                        <td className="py-1.5 px-2.5 text-right tabular-nums text-slate-500 dark:text-[#8B949E]">
+                        <td className="py-2 px-3 text-right tabular-nums text-slate-500 dark:text-[#8B949E]">
                           {(data.financial_statement?.prev_revenue || 6800000).toLocaleString()}
                         </td>
-                        <td className="py-1.5 px-2.5 text-right tabular-nums font-semibold text-emerald-600 dark:text-emerald-400">
+                        <td className="py-2 px-3 text-right tabular-nums font-semibold text-emerald-600 dark:text-emerald-400">
                           {data.metrics?.rev_growth_qoq >= 0 ? "+" : ""}{data.metrics?.rev_growth_qoq}%
                         </td>
                       </tr>
                       <tr>
-                        <td className="py-1.5 px-2.5 text-slate-900 dark:text-white font-medium">Net Profit (PATAMI)</td>
-                        <td className="py-1.5 px-2.5 text-right tabular-nums text-slate-900 dark:text-white font-bold">
+                        <td className="py-2 px-3 text-slate-900 dark:text-white font-medium">Net Profit (PATAMI)</td>
+                        <td className="py-2 px-3 text-right tabular-nums text-slate-900 dark:text-white font-bold">
                           {(data.financial_statement?.net_profit || 2350000).toLocaleString()}
                         </td>
-                        <td className="py-1.5 px-2.5 text-right tabular-nums text-slate-500 dark:text-[#8B949E]">
+                        <td className="py-2 px-3 text-right tabular-nums text-slate-500 dark:text-[#8B949E]">
                           {(data.financial_statement?.prev_net_profit || 2200000).toLocaleString()}
                         </td>
-                        <td className="py-1.5 px-2.5 text-right tabular-nums font-semibold text-emerald-600 dark:text-emerald-400">
+                        <td className="py-2 px-3 text-right tabular-nums font-semibold text-emerald-600 dark:text-emerald-400">
                           {data.metrics?.profit_growth_qoq >= 0 ? "+" : ""}{data.metrics?.profit_growth_qoq}%
                         </td>
                       </tr>
                       <tr>
-                        <td className="py-1.5 px-2.5 text-slate-900 dark:text-white font-medium">Total Borrowings</td>
-                        <td className="py-1.5 px-2.5 text-right tabular-nums text-slate-900 dark:text-white">
+                        <td className="py-2 px-3 text-slate-900 dark:text-white font-medium">Total Borrowings</td>
+                        <td className="py-2 px-3 text-right tabular-nums text-slate-900 dark:text-white font-medium">
                           {(data.financial_statement?.total_borrowings || 45000000).toLocaleString()}
                         </td>
-                        <td className="py-1.5 px-2.5 text-right tabular-nums text-slate-500 dark:text-[#8B949E]">
+                        <td className="py-2 px-3 text-right tabular-nums text-slate-500 dark:text-[#8B949E]">
                           {((data.financial_statement?.total_borrowings || 45000000) * 0.98).toLocaleString()}
                         </td>
-                        <td className="py-1.5 px-2.5 text-right tabular-nums text-slate-500 dark:text-[#8B949E]">+2.04%</td>
+                        <td className="py-2 px-3 text-right tabular-nums text-slate-500 dark:text-[#8B949E]">+2.04%</td>
                       </tr>
                       <tr>
-                        <td className="py-1.5 px-2.5 text-slate-900 dark:text-white font-medium">Cash & Bank Balances</td>
-                        <td className="py-1.5 px-2.5 text-right tabular-nums text-emerald-600 dark:text-emerald-400 font-bold">
+                        <td className="py-2 px-3 text-slate-900 dark:text-white font-medium">Cash & Bank Balances</td>
+                        <td className="py-2 px-3 text-right tabular-nums text-emerald-600 dark:text-emerald-400 font-bold">
                           {(data.financial_statement?.cash || 60000000).toLocaleString()}
                         </td>
-                        <td className="py-1.5 px-2.5 text-right tabular-nums text-slate-500 dark:text-[#8B949E]">
+                        <td className="py-2 px-3 text-right tabular-nums text-slate-500 dark:text-[#8B949E]">
                           {((data.financial_statement?.cash || 60000000) * 0.97).toLocaleString()}
                         </td>
-                        <td className="py-1.5 px-2.5 text-right tabular-nums text-emerald-600 dark:text-emerald-400 font-semibold">+3.09%</td>
+                        <td className="py-2 px-3 text-right tabular-nums text-emerald-600 dark:text-emerald-400 font-semibold">+3.09%</td>
                       </tr>
                       <tr>
-                        <td className="py-1.5 px-2.5 text-slate-900 dark:text-white font-medium">Basic EPS (sen)</td>
-                        <td className="py-1.5 px-2.5 text-right tabular-nums text-slate-900 dark:text-white font-bold">
+                        <td className="py-2 px-3 text-slate-900 dark:text-white font-medium">Basic EPS (sen)</td>
+                        <td className="py-2 px-3 text-right tabular-nums text-slate-900 dark:text-white font-bold">
                           {(data.financial_statement?.eps_sen || 19.5).toFixed(2)}
                         </td>
-                        <td className="py-1.5 px-2.5 text-right tabular-nums text-slate-500 dark:text-[#8B949E]">
+                        <td className="py-2 px-3 text-right tabular-nums text-slate-500 dark:text-[#8B949E]">
                           {((data.financial_statement?.eps_sen || 19.5) * 0.94).toFixed(2)}
                         </td>
-                        <td className="py-1.5 px-2.5 text-right tabular-nums text-emerald-600 dark:text-emerald-400 font-semibold">+6.38%</td>
+                        <td className="py-2 px-3 text-right tabular-nums text-emerald-600 dark:text-emerald-400 font-semibold">+6.38%</td>
                       </tr>
                     </tbody>
                   </table>
@@ -1258,8 +1315,8 @@ export default function App() {
               </div>
 
               {/* 4. DCF Valuation Scenarios */}
-              <div className="bg-white dark:bg-[#121417] border border-slate-200 dark:border-[#1F2328] rounded-lg p-3 sm:p-4 space-y-2">
-                <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#1F2328] pb-1.5">
+              <div className="bg-white dark:bg-[#121417] border border-slate-200 dark:border-[#1F2328] rounded-xl p-4 sm:p-5 space-y-3 shadow-xs">
+                <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#1F2328] pb-2">
                   <div className="flex items-center space-x-2">
                     <Calculator className="w-4 h-4 text-blue-500 dark:text-blue-400" />
                     <span className="font-semibold text-xs text-slate-900 dark:text-white">5-Year DCF Valuation Scenarios</span>
@@ -1267,18 +1324,18 @@ export default function App() {
                   <span className="text-[11px] text-slate-500 dark:text-[#8B949E]">Sensitivity Analysis</span>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                  <div className="bg-slate-50 dark:bg-[#090A0C] p-2 rounded border border-slate-200 dark:border-[#1F2328]">
+                <div className="grid grid-cols-3 gap-2.5 text-center text-xs">
+                  <div className="bg-slate-50 dark:bg-[#090A0C] p-3 rounded-xl border border-slate-200 dark:border-[#1F2328]">
                     <span className="text-[11px] text-slate-500 dark:text-[#8B949E] block mb-0.5">Conservative</span>
                     <span className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm tabular-nums">RM {(data.stock.price * 1.05).toFixed(2)}</span>
                     <span className="text-[10px] text-slate-500 dark:text-[#8B949E] block mt-0.5">WACC: 10.0%</span>
                   </div>
-                  <div className="bg-blue-50/70 dark:bg-blue-950/20 p-2 rounded border border-blue-200 dark:border-blue-800/40">
+                  <div className="bg-blue-50/70 dark:bg-blue-950/20 p-3 rounded-xl border border-blue-200 dark:border-blue-800/40">
                     <span className="text-[11px] text-blue-600 dark:text-blue-400 block font-semibold mb-0.5">Base Case</span>
                     <span className="font-bold text-blue-700 dark:text-blue-300 text-xs sm:text-sm tabular-nums">RM {(data.stock.price * 1.25).toFixed(2)}</span>
                     <span className="text-[10px] text-blue-600/80 dark:text-blue-400/80 block mt-0.5">WACC: 8.5%</span>
                   </div>
-                  <div className="bg-slate-50 dark:bg-[#090A0C] p-2 rounded border border-slate-200 dark:border-[#1F2328]">
+                  <div className="bg-slate-50 dark:bg-[#090A0C] p-3 rounded-xl border border-slate-200 dark:border-[#1F2328]">
                     <span className="text-[11px] text-emerald-600 dark:text-emerald-400 block mb-0.5">Optimistic</span>
                     <span className="font-bold text-emerald-600 dark:text-emerald-400 text-xs sm:text-sm tabular-nums">RM {(data.stock.price * 1.48).toFixed(2)}</span>
                     <span className="text-[10px] text-slate-500 dark:text-[#8B949E] block mt-0.5">WACC: 7.0%</span>
@@ -1292,12 +1349,12 @@ export default function App() {
               highlightCopilot
                 ? "border-blue-500 ring-2 ring-blue-500/50 shadow-lg shadow-blue-500/10"
                 : "border-slate-200 dark:border-[#1F2328]"
-            } rounded-lg h-[540px] sm:h-[620px] lg:h-[760px] transition-all duration-300 ${activeTab === "chat" ? "block" : "hidden lg:flex"}`}>
+            } rounded-xl h-[540px] sm:h-[620px] lg:h-[760px] transition-all duration-300 shadow-xs ${activeTab === "chat" ? "block" : "hidden lg:flex"}`}>
               
               {/* Copilot Header */}
-              <div className="p-3 bg-slate-50 dark:bg-[#16191D] border-b border-slate-200 dark:border-[#1F2328] flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-600/20 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+              <div className="p-3.5 bg-slate-50 dark:bg-[#16191D] border-b border-slate-200 dark:border-[#1F2328] flex items-center justify-between rounded-t-xl">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-6 h-6 rounded-lg bg-blue-100 dark:bg-blue-600/20 text-blue-600 dark:text-blue-400 flex items-center justify-center">
                     <Sparkles className="w-3.5 h-3.5" />
                   </div>
                   <div>
@@ -1318,7 +1375,7 @@ export default function App() {
                       }
                     ]);
                   }}
-                  className="text-[11px] text-slate-500 dark:text-[#8B949E] hover:text-slate-900 dark:hover:text-white px-2 py-1 rounded hover:bg-slate-100 dark:hover:bg-[#1F2328] border border-transparent hover:border-slate-200 dark:hover:border-[#30363D] transition"
+                  className="text-[11px] text-slate-500 dark:text-[#8B949E] hover:text-slate-900 dark:hover:text-white px-2.5 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-[#1F2328] border border-transparent hover:border-slate-200 dark:hover:border-[#30363D] transition"
                   title="Clear conversation"
                 >
                   Clear Chat
@@ -1326,14 +1383,14 @@ export default function App() {
               </div>
 
               {/* Suggested Questions Pills */}
-              <div className="px-3 py-2 bg-slate-50/60 dark:bg-[#121417] border-b border-slate-200 dark:border-[#1F2328] flex items-center space-x-1.5 overflow-x-auto text-xs whitespace-nowrap">
+              <div className="px-3.5 py-2.5 bg-slate-50/60 dark:bg-[#121417] border-b border-slate-200 dark:border-[#1F2328] flex items-center space-x-1.5 overflow-x-auto text-xs whitespace-nowrap">
                 <span className="text-[11px] text-slate-500 dark:text-[#8B949E] shrink-0 mr-1">Suggestions:</span>
                 {SUGGESTED_QUESTIONS.map((q, idx) => (
                   <button
                     key={idx}
                     onClick={() => handleSendMessage(q.prompt)}
                     disabled={chatLoading}
-                    className="bg-white dark:bg-[#16191D] hover:bg-slate-100 dark:hover:bg-[#1F2328] text-slate-600 dark:text-[#8B949E] hover:text-slate-900 dark:hover:text-white text-[11px] px-2 py-0.5 rounded border border-slate-200 dark:border-[#1F2328] transition shrink-0 disabled:opacity-40"
+                    className="bg-white dark:bg-[#16191D] hover:bg-slate-100 dark:hover:bg-[#1F2328] text-slate-600 dark:text-[#8B949E] hover:text-slate-900 dark:hover:text-white text-[11px] px-2.5 py-1 rounded-lg border border-slate-200 dark:border-[#1F2328] transition shrink-0 disabled:opacity-40 active:scale-95 shadow-2xs"
                   >
                     {q.label}
                   </button>
@@ -1341,7 +1398,7 @@ export default function App() {
               </div>
 
               {/* Message Feed */}
-              <div className="flex-1 p-3 sm:p-4 overflow-y-auto space-y-3.5 text-xs">
+              <div className="flex-1 p-3.5 sm:p-4 overflow-y-auto space-y-3.5 text-xs">
                 {chatMessages.map((msg, index) => (
                   <div key={index} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
                     
@@ -1350,15 +1407,15 @@ export default function App() {
                       {msg.time && <span>• {msg.time}</span>}
                     </div>
 
-                    <div className={`p-3 rounded-lg max-w-[92%] leading-relaxed ${
+                    <div className={`p-3.5 rounded-xl max-w-[92%] leading-relaxed ${
                       msg.role === "user"
-                        ? "bg-blue-600 text-white rounded-tr-none shadow-sm"
-                        : "bg-slate-100 dark:bg-[#16191D] text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-[#1F2328] rounded-tl-none"
+                        ? "bg-blue-600 text-white rounded-tr-xs shadow-sm"
+                        : "bg-slate-100 dark:bg-[#16191D] text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-[#1F2328] rounded-tl-xs shadow-2xs"
                     }`}>
                       {msg.role === "user" ? (
                         <p className="whitespace-pre-wrap">{msg.content}</p>
                       ) : (
-                        <div className="prose dark:prose-invert prose-xs max-w-none space-y-1.5 text-slate-800 dark:text-slate-200">
+                        <div className="prose dark:prose-invert prose-xs max-w-none space-y-2 text-slate-800 dark:text-slate-200">
                           <ReactMarkdown
                             components={{
                               h1: ({ node, ...props }) => <h3 className="text-xs font-bold text-slate-900 dark:text-white border-b border-slate-200 dark:border-[#1F2328] pb-1 mt-1 mb-1" {...props} />,
@@ -1369,7 +1426,7 @@ export default function App() {
                               li: ({ node, ...props }) => <li className="text-slate-800 dark:text-slate-200" {...props} />,
                               strong: ({ node, ...props }) => <strong className="font-bold text-slate-900 dark:text-white" {...props} />,
                               blockquote: ({ node, ...props }) => (
-                                <blockquote className="border-l-2 border-blue-500 pl-2 py-0.5 my-1 bg-slate-200/50 dark:bg-[#121417] text-slate-600 dark:text-[#8B949E] italic text-[11px]" {...props} />
+                                <blockquote className="border-l-2 border-blue-500 pl-2.5 py-1 my-1.5 bg-slate-200/50 dark:bg-[#121417] text-slate-600 dark:text-[#8B949E] italic text-[11px] rounded-r" {...props} />
                               ),
                             }}
                           >
@@ -1383,14 +1440,14 @@ export default function App() {
 
                 {chatLoading && (
                   <div className="flex flex-col items-start">
-                    <div className="text-[10px] text-slate-500 dark:text-[#8B949E] mb-1">Analyst Copilot is analyzing filings...</div>
-                    <div className="bg-slate-100 dark:bg-[#16191D] border border-slate-200 dark:border-[#1F2328] rounded-lg rounded-tl-none p-3 flex items-center space-x-2 text-slate-700 dark:text-slate-300">
-                      <div className="flex space-x-1">
+                    <div className="text-[10px] text-slate-500 dark:text-[#8B949E] mb-1">Analyst Copilot is reviewing disclosures...</div>
+                    <div className="bg-slate-100 dark:bg-[#16191D] border border-slate-200 dark:border-[#1F2328] rounded-xl rounded-tl-xs p-3.5 flex items-center space-x-2 text-slate-700 dark:text-slate-300 shadow-2xs">
+                      <div className="flex space-x-1.5">
                         <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce"></div>
                         <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:0.2s]"></div>
                         <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:0.4s]"></div>
                       </div>
-                      <span className="text-[11px] text-slate-500 dark:text-[#8B949E]">Reviewing quarterly disclosures...</span>
+                      <span className="text-[11px] text-slate-500 dark:text-[#8B949E]">Reviewing quarterly disclosures & notes...</span>
                     </div>
                   </div>
                 )}
@@ -1398,7 +1455,7 @@ export default function App() {
               </div>
 
               {/* Chat Input Bar */}
-              <div className="p-3 bg-slate-50 dark:bg-[#121417] border-t border-slate-200 dark:border-[#1F2328]">
+              <div className="p-3.5 bg-slate-50 dark:bg-[#121417] border-t border-slate-200 dark:border-[#1F2328] rounded-b-xl">
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
@@ -1410,20 +1467,20 @@ export default function App() {
                     type="text"
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
-                    placeholder={`Ask about ${data.stock.name} revenue, debt, or prospects...`}
-                    className="flex-1 bg-white dark:bg-[#090A0C] border border-slate-200 dark:border-[#1F2328] rounded px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-[#6E7681] focus:outline-none focus:border-blue-500 transition"
+                    placeholder={`Ask about ${data.stock.name} revenue, debt, or outlook...`}
+                    className="flex-1 bg-white dark:bg-[#090A0C] border border-slate-200 dark:border-[#1F2328] rounded-xl px-3.5 py-2.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-[#6E7681] focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition"
                   />
                   <button
                     type="submit"
                     disabled={chatLoading || !chatInput.trim()}
-                    className="bg-blue-600 hover:bg-blue-500 text-white p-2 rounded transition disabled:opacity-40"
+                    className="bg-blue-600 hover:bg-blue-500 text-white p-2.5 rounded-xl transition disabled:opacity-40 active:scale-95 shadow-xs"
                     title="Send message"
                   >
                     <Send className="w-4 h-4" />
                   </button>
                 </form>
-                <p className="text-[10px] text-slate-500 dark:text-[#8B949E] text-center mt-1.5">
-                  AI insights grounded in official quarterly reports
+                <p className="text-[10px] text-slate-500 dark:text-[#8B949E] text-center mt-2">
+                  AI insights grounded in verified quarterly reports
                 </p>
               </div>
 
@@ -1453,10 +1510,10 @@ export default function App() {
             {/* Title & Subtitle */}
             <div className="space-y-1">
               <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                Analyzing {loadingStockName || "Company Reports"}...
+                Reviewing {loadingStockName || "Company Reports"}...
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Pulling official quarterly disclosures and generating insights
+                Retrieving official quarterly disclosures and generating insights
               </p>
             </div>
 
@@ -1469,7 +1526,7 @@ export default function App() {
                   <RefreshCw className="w-4 h-4 text-blue-500 dark:text-blue-400 animate-spin shrink-0" />
                 )}
                 <span className={loadingStep >= 1 ? "text-slate-800 dark:text-slate-200 font-medium" : "text-slate-400 dark:text-slate-500"}>
-                  1. Retrieving quarterly financial statements & balance sheets
+                  1. Retrieving verified quarterly financial statements
                 </span>
               </div>
 
@@ -1482,7 +1539,7 @@ export default function App() {
                   <div className="w-4 h-4 rounded-full border border-slate-300 dark:border-slate-700 shrink-0" />
                 )}
                 <span className={loadingStep >= 2 ? "text-slate-800 dark:text-slate-200 font-medium" : "text-slate-400 dark:text-slate-500"}>
-                  2. Extracting financial tables & explanatory notes
+                  2. Extracting balance sheet & explanatory notes
                 </span>
               </div>
 
@@ -1495,7 +1552,7 @@ export default function App() {
                   <div className="w-4 h-4 rounded-full border border-slate-300 dark:border-slate-700 shrink-0" />
                 )}
                 <span className={loadingStep >= 3 ? "text-slate-800 dark:text-slate-200 font-medium" : "text-slate-400 dark:text-slate-500"}>
-                  3. Analyzing revenue drivers & profit margins
+                  3. Analyzing revenue drivers & operating margins
                 </span>
               </div>
 
@@ -1506,7 +1563,7 @@ export default function App() {
                   <div className="w-4 h-4 rounded-full border border-slate-300 dark:border-slate-700 shrink-0" />
                 )}
                 <span className={loadingStep >= 4 ? "text-emerald-600 dark:text-emerald-400 font-medium" : "text-slate-400 dark:text-slate-500"}>
-                  4. Preparing research overview & copilot
+                  4. Preparing financial model & analyst workspace
                 </span>
               </div>
             </div>
