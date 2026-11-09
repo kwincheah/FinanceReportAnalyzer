@@ -110,31 +110,77 @@ function parseQuery(query: string) {
   const qLower = query.toLowerCase().trim();
   let matchedCompany: typeof POPULAR_COMPANIES[0] | null = null;
 
-  for (const comp of POPULAR_COMPANIES) {
-    const aliases = [
-      comp.code,
-      comp.ticker.toLowerCase(),
-      comp.name.toLowerCase(),
-      ...comp.name.toLowerCase().split(" "),
-    ].filter(t => t.length > 2);
+  // 1. Semantic Superlatives & Industry Leaders (Malaysia / Bursa KLSE)
+  if (
+    /(largest|biggest|top|no\.?\s?1|number\s?one)\s+(bank|banking|lender)/i.test(qLower) ||
+    /malaysia('?s)?\s+(largest|biggest|top)\s+bank/i.test(qLower)
+  ) {
+    // Maybank (1155) is Malaysia's largest bank and #1 company by market cap (RM 122.5B)
+    matchedCompany = POPULAR_COMPANIES.find(c => c.code === "1155") || null;
+  } else if (
+    /(second|2nd)\s+(largest|biggest)\s+(bank|banking|lender)/i.test(qLower) ||
+    /malaysia('?s)?\s+(second|2nd)\s+(largest|biggest)\s+bank/i.test(qLower)
+  ) {
+    // CIMB Group (1023) is Malaysia's 2nd largest bank
+    matchedCompany = POPULAR_COMPANIES.find(c => c.code === "1023") || null;
+  } else if (
+    /(third|3rd)\s+(largest|biggest)\s+(bank|banking|lender)/i.test(qLower) ||
+    /malaysia('?s)?\s+(third|3rd)\s+(largest|biggest)\s+bank/i.test(qLower)
+  ) {
+    // Public Bank (1295) is Malaysia's 3rd largest bank
+    matchedCompany = POPULAR_COMPANIES.find(c => c.code === "1295") || null;
+  } else if (/(largest|biggest)\s+(utility|power|electric)/i.test(qLower)) {
+    // Tenaga Nasional (5347)
+    matchedCompany = POPULAR_COMPANIES.find(c => c.code === "5347") || null;
+  } else if (/(largest|biggest)\s+(glove|rubber)/i.test(qLower)) {
+    // Top Glove (7113)
+    matchedCompany = POPULAR_COMPANIES.find(c => c.code === "7113") || null;
+  } else if (/(largest|biggest)\s+(retail|hardware|home\s?improvement)/i.test(qLower)) {
+    // MR D.I.Y. (5296)
+    matchedCompany = POPULAR_COMPANIES.find(c => c.code === "5296") || null;
+  }
 
-    if (comp.name.toLowerCase().includes("tenaga")) aliases.push("tnb", "tenaga");
-    if (comp.name.toLowerCase().includes("maybank")) aliases.push("malayan banking", "maybank");
-    if (comp.name.toLowerCase().includes("cimb")) aliases.push("cimb");
-    if (comp.name.toLowerCase().includes("d.i.y")) aliases.push("diy", "mr diy", "mr. diy", "mrdiy");
-    if (comp.name.toLowerCase().includes("public bank")) aliases.push("pbb", "public bank");
-    if (comp.name.toLowerCase().includes("top glove")) aliases.push("top glove", "topglove", "glove");
-    if (comp.name.toLowerCase().includes("petronas chem")) aliases.push("petchem", "petronas", "pcg");
-    if (comp.name.toLowerCase().includes("ytl power")) aliases.push("ytl", "ytl power", "ytlpower");
+  // 2. Generic Sector Stopwords: words that describe an industry or corporate entity type,
+  // NOT a distinct company name. These must NEVER be single-word company aliases.
+  const SECTOR_STOPWORDS = new Set([
+    "bank", "banking", "group", "holdings", "berhad", "bhd", "corp", "corporation",
+    "chem", "chemicals", "power", "malaysia", "retail", "national", "international",
+    "services", "the", "and", "company", "stock", "equity", "share", "shares"
+  ]);
 
-    for (const alias of aliases) {
-      const reg = new RegExp(`\\b${alias.replace('.', '\\.')}\\b`, 'i');
-      if (reg.test(qLower)) {
-        matchedCompany = comp;
-        break;
+  if (!matchedCompany) {
+    for (const comp of POPULAR_COMPANIES) {
+      // Split company name into words, but strip common sector stopwords so "bank" doesn't alias to Public Bank
+      const distinctNameWords = comp.name
+        .toLowerCase()
+        .split(/[\s\.\(\)\/]+/)
+        .filter(t => t.length > 2 && !SECTOR_STOPWORDS.has(t));
+
+      const aliases = [
+        comp.code,
+        comp.ticker.toLowerCase(),
+        comp.name.toLowerCase(),
+        ...distinctNameWords,
+      ];
+
+      if (comp.name.toLowerCase().includes("tenaga")) aliases.push("tnb", "tenaga");
+      if (comp.name.toLowerCase().includes("maybank")) aliases.push("malayan banking", "maybank");
+      if (comp.name.toLowerCase().includes("cimb")) aliases.push("cimb");
+      if (comp.name.toLowerCase().includes("d.i.y")) aliases.push("diy", "mr diy", "mr. diy", "mrdiy");
+      if (comp.name.toLowerCase().includes("public bank")) aliases.push("pbb", "public bank");
+      if (comp.name.toLowerCase().includes("top glove")) aliases.push("top glove", "topglove");
+      if (comp.name.toLowerCase().includes("petronas chem")) aliases.push("petchem", "petronas", "pcg");
+      if (comp.name.toLowerCase().includes("ytl power")) aliases.push("ytl power", "ytlpower");
+
+      for (const alias of aliases) {
+        const reg = new RegExp(`\\b${alias.replace('.', '\\.')}\\b`, 'i');
+        if (reg.test(qLower)) {
+          matchedCompany = comp;
+          break;
+        }
       }
+      if (matchedCompany) break;
     }
-    if (matchedCompany) break;
   }
 
   if (!matchedCompany) {
