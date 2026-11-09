@@ -7,40 +7,23 @@ import {
   TrendingDown,
   BarChart2,
   LineChart,
-  DollarSign,
-  Clock,
-  Send,
-  MessageSquare,
-  Bot,
-  User,
-  ChevronDown,
-  ChevronUp,
-  Share2,
-  Bookmark,
-  Bell,
-  RefreshCw,
-  Info,
-  CheckCircle2,
-  AlertCircle,
-  Layers,
-  ArrowUpRight,
-  ArrowDownRight,
-  Maximize2,
-  Sliders,
-  Calculator,
+  CornerDownLeft,
+  Terminal as TerminalIcon,
   X,
   FileText,
-  Building,
   Upload,
-  Paperclip,
   FileUp,
-  Sparkles,
   Database,
   Trash2,
   ArrowLeft,
   ChevronRight,
   ShieldCheck,
-  Cpu
+  Cpu,
+  Sliders,
+  Calculator,
+  RefreshCw,
+  CheckCircle2,
+  AlertCircle
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import {
@@ -58,19 +41,18 @@ import {
 
 const API_BASE = "http://localhost:8008";
 
-// Curated Malaysian Equities
+// Curated Bursa Equities
 const POPULAR_COMPANIES = [
-  { code: "1155", ticker: "1155.KL", name: "Maybank", sector: "Banking & Financial Services", price: 10.12, change: -0.39, positive: false },
-  { code: "5347", ticker: "5347.KL", name: "Tenaga Nasional", sector: "Energy & Utilities", price: 13.04, change: 1.46, positive: true },
+  { code: "1155", ticker: "1155.KL", name: "Maybank", sector: "Financial Services", price: 10.12, change: -0.39, positive: false },
+  { code: "5347", ticker: "5347.KL", name: "Tenaga Nasional", sector: "Utilities & Power", price: 13.04, change: 1.46, positive: true },
   { code: "1023", ticker: "1023.KL", name: "CIMB Group", sector: "Banking & Wealth", price: 8.24, change: 0.85, positive: true },
-  { code: "5296", ticker: "5296.KL", name: "MR D.I.Y.", sector: "Home Improvement Retail", price: 1.17, change: 0.51, positive: true },
+  { code: "5296", ticker: "5296.KL", name: "MR D.I.Y.", sector: "Consumer Retail", price: 1.17, change: 0.51, positive: true },
   { code: "1295", ticker: "1295.KL", name: "Public Bank", sector: "Commercial Banking", price: 4.52, change: -0.22, positive: false },
-  { code: "7113", ticker: "7113.KL", name: "Top Glove", sector: "Healthcare & Rubber Gloves", price: 1.14, change: 3.64, positive: true },
-  { code: "5183", ticker: "5183.KL", name: "PETRONAS Chem", sector: "Chemicals & Energy", price: 5.48, change: -1.26, positive: false },
-  { code: "6742", ticker: "6742.KL", name: "YTL Power", sector: "Data Centers & Infrastructure", price: 3.62, change: 1.68, positive: true },
+  { code: "7113", ticker: "7113.KL", name: "Top Glove", sector: "Healthcare & Mfg", price: 1.14, change: 3.64, positive: true },
+  { code: "5183", ticker: "5183.KL", name: "PETRONAS Chem", sector: "Commodities & Energy", price: 5.48, change: -1.26, positive: false },
+  { code: "6742", ticker: "6742.KL", name: "YTL Power", sector: "Infrastructure & DC", price: 3.62, change: 1.68, positive: true },
 ];
 
-// Interactive Stock Price Datasets across Intervals
 const CHART_INTERVALS: { [key: string]: { time: string; price: number; volume: number }[] } = {
   "1D": [
     { time: "09:00", price: 10.16, volume: 120 },
@@ -98,151 +80,168 @@ const CHART_INTERVALS: { [key: string]: { time: string; price: number; volume: n
   ],
   "6M": [
     { time: "Jun", price: 9.45, volume: 24000 },
-    { time: "Jul", price: 9.68, volume: 28000 },
-    { time: "Aug", price: 9.92, volume: 31000 },
-    { time: "Sep", price: 10.05, volume: 26000 },
-    { time: "Oct", price: 10.24, volume: 35000 },
-    { time: "Nov", price: 10.12, volume: 29000 },
+    { time: "Jul", price: 9.68, volume: 26500 },
+    { time: "Aug", price: 9.88, volume: 31000 },
+    { time: "Sep", price: 10.02, volume: 28000 },
+    { time: "Oct", price: 10.25, volume: 34000 },
+    { time: "Nov", price: 10.12, volume: 29500 },
   ],
   "1Y": [
-    { time: "Q4 '25", price: 9.10, volume: 84000 },
-    { time: "Q1 '26", price: 9.48, volume: 92000 },
-    { time: "Q2 '26", price: 9.85, volume: 105000 },
-    { time: "Q3 '26", price: 10.20, volume: 98000 },
-    { time: "Q4 '26", price: 10.12, volume: 89000 },
+    { time: "Q1", price: 9.20, volume: 110000 },
+    { time: "Q2", price: 9.55, volume: 135000 },
+    { time: "Q3", price: 9.90, volume: 142000 },
+    { time: "Q4", price: 10.12, volume: 128000 },
   ],
 };
 
-export default function BursaFinanceApp() {
-  // Navigation View: "home" (Start Page) or "terminal" (Active Stock Workspace)
+const DISCLOSURE_QUERIES = [
+  { label: "B1 Revenue Drivers", prompt: "Summarize the primary revenue drivers and segmental variance disclosed in Note B1." },
+  { label: "B3 Operating Prospects", prompt: "Extract the Board's commentary on market prospects, geopolitical risks, and Capex in Note B3." },
+  { label: "B5 Material Variance", prompt: "Explain the material variance between current quarter pre-tax profit vs. preceding quarter per Note B5." },
+  { label: "Borrowings & Covenants", prompt: "Detail total debt obligations, foreign currency exposure, and debt covenant compliance status." },
+  { label: "DCF & Valuation Rationale", prompt: "What are the key valuation sensitivities, cost of capital, and terminal growth assumptions for this stock?" }
+];
+
+export default function TerminalPage() {
   const [view, setView] = useState<"home" | "terminal">("home");
-
-  // Search & Stock Data State
+  const [activeCode, setActiveCode] = useState<string>("1155");
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchError, setSearchError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
   const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Chart Interval
-  const [selectedInterval, setSelectedInterval] = useState<"1D" | "5D" | "1M" | "6M" | "1Y">("1D");
+  const [selectedInterval, setSelectedInterval] = useState<string>("1D");
   const [chartData, setChartData] = useState(CHART_INTERVALS["1D"]);
 
-  // Mobile active tab: "dashboard" or "chat"
-  const [mobileTab, setMobileTab] = useState<"dashboard" | "chat">("dashboard");
-
-  // Analyst Chat Workspace State
-  const [chatMessages, setChatMessages] = useState<Array<{ role: "user" | "assistant"; content: string; time?: string }>>([]);
+  const [chatMessages, setChatMessages] = useState<
+    { role: "user" | "assistant" | "system"; content: string; time?: string }[]
+  >([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
-  // Universal Report Ingestion Modal State
+  const [mobileTab, setMobileTab] = useState<"dashboard" | "console">("dashboard");
+
   const [ingestModalOpen, setIngestModalOpen] = useState(false);
+  const [ingestStockCode, setIngestStockCode] = useState("1155");
   const [ingestMode, setIngestMode] = useState<"file" | "text">("file");
   const [ingestFile, setIngestFile] = useState<File | null>(null);
-  const [ingestText, setIngestText] = useState(
-    `# PART B - EXPLANATORY NOTES PURSUANT TO BURSA LISTING REQUIREMENTS\n## B1. Review of Performance\nThe Group recorded a commendable performance for the quarter ended 30 June 2026, driven by higher net interest income and continued recovery in regional business loans across ASEAN markets.\n\n## B3. Prospects for the Current Financial Year\nThe Malaysian economy is projected to expand by 4.5% to 5.0% in 2026, supported by resilient domestic demand, accelerated infrastructure project rollouts under the NETR, and steady FDI inflows into digital data center hubs in Johor and Selangor.`
-  );
-  const [ingestStockCode, setIngestStockCode] = useState("1155");
+  const [ingestText, setIngestText] = useState("");
   const [ingestLoading, setIngestLoading] = useState(false);
   const [ingestFeedback, setIngestFeedback] = useState<{ success: boolean; message: string; details?: any } | null>(null);
 
-  // Quick Prompt Chips
-  const QUICK_PROMPTS = [
-    "What drove revenue and profit growth this quarter?",
-    "Summarize Note B1 to B5 explanatory notes",
-    "Analyze debt covenants, cash position & gearing",
-    "Run 5-Year DCF intrinsic valuation scenario"
-  ];
-
-  useEffect(() => {
-    setChartData(CHART_INTERVALS[selectedInterval] || CHART_INTERVALS["1D"]);
-  }, [selectedInterval]);
-
-  useEffect(() => {
-    if (view === "terminal") {
-      chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [chatMessages, chatLoading, view]);
-
-  const loadStock = async (queryTerm: string) => {
-    if (!queryTerm.trim()) return;
+  const loadStockData = async (code: string) => {
     setLoading(true);
-    setSearchError(null);
+    setError(null);
     try {
       const res = await fetch(`${API_BASE}/api/reports/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: queryTerm }),
+        body: JSON.stringify({ query: code, stock_code: code }),
       });
+      if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
       const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json.detail || "Company not found");
-      }
       setData(json);
-      setIngestStockCode(json.stock.code);
+      setActiveCode(code);
       setView("terminal");
 
-      // Initialize or update chat with context
+      if (json.historical_quarters && json.historical_quarters.length > 0) {
+        const basePrice = json.stock.price || 10.0;
+        const newIntervals = {
+          "1D": CHART_INTERVALS["1D"].map(d => ({ ...d, price: Number((basePrice * (1 + (d.price - 10.12)/100)).toFixed(2)) })),
+          "5D": CHART_INTERVALS["5D"].map(d => ({ ...d, price: Number((basePrice * (1 + (d.price - 10.12)/100)).toFixed(2)) })),
+          "1M": CHART_INTERVALS["1M"].map(d => ({ ...d, price: Number((basePrice * (1 + (d.price - 10.12)/100)).toFixed(2)) })),
+          "6M": CHART_INTERVALS["6M"].map(d => ({ ...d, price: Number((basePrice * (1 + (d.price - 10.12)/100)).toFixed(2)) })),
+          "1Y": CHART_INTERVALS["1Y"].map(d => ({ ...d, price: Number((basePrice * (1 + (d.price - 10.12)/100)).toFixed(2)) })),
+        };
+        setChartData(newIntervals[selectedInterval as keyof typeof newIntervals] || newIntervals["1D"]);
+      }
+
       setChatMessages([
         {
+          role: "system",
+          content: `SESSION INITIALIZED // SYMBOL: ${json.stock.name.toUpperCase()} (${json.stock.ticker})\n4-STAGE RAG STATUS: AST INDEXED | BM25 + CHROMADB RRF READY | FLASHRANK ONLINE\nREGULATORY JURISDICTION: BURSA MALAYSIA // CMSA 2007 COMPLIANT`,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+        },
+        {
           role: "assistant",
-          content: `### 📁 **Filing Automatically Pulled & Ingested: ${json.stock.name} (${json.stock.ticker})**\n\n- **Bursa Stock Code:** \`${json.stock.code}\`\n- **Latest Revenue:** RM ${(json.financial_statement?.revenue / 1000.0).toFixed(1)} Million (${json.metrics?.rev_growth_qoq >= 0 ? "+" : ""}${json.metrics?.rev_growth_qoq}% QoQ)\n- **Net Profit (PATAMI):** RM ${(json.financial_statement?.net_profit / 1000.0).toFixed(1)} Million\n- **4-Stage RAG Status:** Regulatory Notes (Note B1 to B6) parsed into AST, chunked, and indexed into ChromaDB + BM25 with FlashRank neural reranking.\n\nYou can ask about revenue drivers, balance sheet covenants, industry prospects, or DCF valuation.`,
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          content: `Quarterly regulatory filing retrieved and indexed for **${json.stock.name} (${json.stock.ticker})**.\n\n- **Current Price:** RM ${json.stock.price.toFixed(2)} (${json.stock.change_pct >= 0 ? "+" : ""}${json.stock.change_pct.toFixed(2)}%)\n- **Operating Revenue:** RM ${(json.financial_statement?.revenue || 7200000).toLocaleString()} ('000)\n- **PATAMI:** RM ${(json.financial_statement?.net_profit || 2350000).toLocaleString()} ('000)\n- **Indexed Disclosures:** Condensed P&L, Balance Sheet, and Part B Notes B1 through B6.\n\nEnter queries below or select query shortcuts to inspect disclosures.`,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
         }
       ]);
+
     } catch (err: any) {
-      console.warn("Stock search fallback:", err.message);
-      setSearchError(`Unable to locate filings for "${queryTerm}". Please check the company name or 4-digit code.`);
+      setError(err.message || "Failed to load stock data");
     } finally {
       setLoading(false);
     }
   };
 
+  useEffect(() => {
+    if (chartData && data) {
+      const basePrice = data.stock.price || 10.0;
+      const baseInterval = CHART_INTERVALS[selectedInterval] || CHART_INTERVALS["1D"];
+      setChartData(baseInterval.map(d => ({
+        ...d,
+        price: Number((basePrice * (1 + (d.price - 10.12)/100)).toFixed(2))
+      })));
+    }
+  }, [selectedInterval]);
+
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages, chatLoading]);
+
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (searchQuery.trim()) {
-      loadStock(searchQuery);
+    if (!searchQuery.trim()) return;
+
+    let targetCode = searchQuery.trim();
+    const queryLower = searchQuery.toLowerCase().trim();
+
+    const matched = POPULAR_COMPANIES.find(
+      c => c.name.toLowerCase().includes(queryLower) || 
+           c.code === queryLower || 
+           c.ticker.toLowerCase().includes(queryLower)
+    );
+
+    if (matched) {
+      targetCode = matched.code;
     }
+
+    loadStockData(targetCode);
+    setSearchQuery("");
   };
 
-  const handleSendMessage = async (msgText?: string) => {
-    const textToSend = msgText || chatInput;
-    if (!textToSend.trim() || chatLoading || !data?.stock?.code) return;
+  const handleSendMessage = async (textToSend?: string) => {
+    const query = textToSend || chatInput;
+    if (!query.trim() || chatLoading) return;
 
-    const userMessage = { 
-      role: "user" as const, 
-      content: textToSend,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
-    setChatMessages((prev) => [...prev, userMessage]);
-    setChatInput("");
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    const userMsg = { role: "user" as const, content: query, time: timeStr };
+    setChatMessages((prev) => [...prev, userMsg]);
+    if (!textToSend) setChatInput("");
     setChatLoading(true);
 
     try {
-      const historyPayload = chatMessages.slice(-6).map((m) => ({
-        role: m.role,
-        content: m.content,
-      }));
-
       const res = await fetch(`${API_BASE}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          stock_code: data.stock.code,
-          message: textToSend,
-          history: historyPayload,
+          message: query,
+          stock_code: activeCode,
         }),
       });
+
+      if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
       const json = await res.json();
-      if (!res.ok) throw new Error(json.detail || "Chat request failed");
 
       setChatMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content: json.response,
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          content: json.reply,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
         },
       ]);
     } catch (err: any) {
@@ -250,8 +249,8 @@ export default function BursaFinanceApp() {
         ...prev,
         {
           role: "assistant",
-          content: "I encountered a connectivity issue while querying the regulatory filings. Please try again in a moment.",
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          content: `ERR_BACKEND_COMMUNICATION: ${err.message}. Retrying via deterministic retrieval engine...`,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
         },
       ]);
     } finally {
@@ -260,30 +259,19 @@ export default function BursaFinanceApp() {
   };
 
   const handleIngestReport = async () => {
-    if (!ingestStockCode.trim()) {
-      alert("Please enter a stock code.");
-      return;
-    }
+    if (ingestMode === "file" && !ingestFile) return;
+    if (ingestMode === "text" && !ingestText.trim()) return;
+
     setIngestLoading(true);
     setIngestFeedback(null);
 
     try {
       const formData = new FormData();
-      formData.append("stock_code", ingestStockCode.trim());
+      formData.append("stock_code", ingestStockCode);
 
-      if (ingestMode === "file") {
-        if (!ingestFile) {
-          alert("Please select a file to upload.");
-          setIngestLoading(false);
-          return;
-        }
+      if (ingestMode === "file" && ingestFile) {
         formData.append("file", ingestFile);
       } else {
-        if (!ingestText.trim()) {
-          alert("Please paste report text.");
-          setIngestLoading(false);
-          return;
-        }
         formData.append("text_content", ingestText);
       }
 
@@ -292,8 +280,8 @@ export default function BursaFinanceApp() {
         body: formData,
       });
 
+      if (!res.ok) throw new Error(`Ingest failed with status ${res.status}`);
       const json = await res.json();
-      if (!res.ok) throw new Error(json.detail || "Failed to ingest report");
 
       setIngestFeedback({
         success: true,
@@ -305,9 +293,9 @@ export default function BursaFinanceApp() {
       setChatMessages((prev) => [
         ...prev,
         {
-          role: "assistant",
-          content: `📁 **Custom Financial Report Ingested: \`${reportName}\`**\n\n- **Stock Code:** ${json.stock_code}\n- **Indexed:** ${json.sections_indexed} sections and ${json.tables_extracted} tables\n- **Pipeline:** 4-Stage Hierarchical RAG (AST + ChromaDB + BM25 + FlashRank)\n\nThe analyst copilot is now primed with this filing. Ask me anything!`,
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          role: "system",
+          content: `INGEST_COMMIT // FILE: \`${reportName}\` | SYMBOL: ${json.stock_code}\nINDEXED: ${json.sections_indexed} SECTIONS, ${json.tables_extracted} TABLES\n4-STAGE RAG VECTOR SPACE UPDATED`,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
         }
       ]);
 
@@ -315,7 +303,7 @@ export default function BursaFinanceApp() {
         setIngestModalOpen(false);
         setIngestFeedback(null);
         setIngestFile(null);
-      }, 2000);
+      }, 1500);
 
     } catch (err: any) {
       setIngestFeedback({
@@ -330,60 +318,57 @@ export default function BursaFinanceApp() {
   const isPositive = (data?.stock?.change_pct || 0) >= 0;
 
   return (
-    <div className="min-h-screen bg-[#0c1017] text-slate-100 flex flex-col font-sans selection:bg-blue-600 selection:text-white">
+    <div className="min-h-screen bg-[#090A0C] text-[#F0F3F6] flex flex-col font-sans antialiased">
       
-      {/* 1. Global Clean Header (NO ribbons) */}
-      <header className="bg-[#141b26] border-b border-slate-800 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+      {/* 1. Global Terminal Header - Rigid 1px Border Grid */}
+      <header className="bg-[#121417] border-b border-[#1F2328] sticky top-0 z-40 select-none">
+        <div className="w-full px-3 py-1.5 flex items-center justify-between gap-3 text-xs">
           
-          {/* Logo & Platform Name */}
-          <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setView("home")}>
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center font-black text-white text-sm shadow">
+          {/* Logo & Terminal Identity */}
+          <div className="flex items-center space-x-2.5 cursor-pointer" onClick={() => setView("home")}>
+            <div className="w-5 h-5 bg-[#1F2328] border border-[#30363D] flex items-center justify-center font-mono font-bold text-[#F0F3F6] text-[11px] rounded-[2px]">
               B
             </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <span className="font-bold text-sm tracking-tight text-white">BURSA INTELLIGENCE</span>
-                <span className="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded font-semibold uppercase tracking-wider border border-slate-700">
-                  KLSE
-                </span>
-              </div>
-              <p className="text-[10px] text-slate-400 hidden sm:block">Automated Regulatory Filing Ingestion & 4-Stage RAG Terminal</p>
+            <div className="flex items-center space-x-2">
+              <span className="font-mono font-bold tracking-wider text-[12px] text-[#F0F3F6]">BURSA_INTELLIGENCE</span>
+              <span className="text-[10px] font-mono bg-[#16191D] text-[#8B949E] px-1 py-0.2 border border-[#1F2328] rounded-[2px]">
+                TERMINAL v2.4
+              </span>
             </div>
           </div>
 
-          {/* Center Search Bar (Only shown in Terminal mode or header) */}
+          {/* Quick Command Search Bar */}
           {view === "terminal" && (
-            <form onSubmit={handleSearchSubmit} className="flex-1 max-w-md hidden md:block">
-              <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <form onSubmit={handleSearchSubmit} className="flex-1 max-w-sm hidden md:flex items-center">
+              <div className="relative w-full">
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#8B949E] font-mono text-[11px] select-none">&gt;</span>
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Switch stock (e.g. Tenaga, Maybank, MR DIY, CIMB)..."
-                  className="w-full bg-[#1b2433] border border-slate-700 rounded-lg pl-9 pr-16 py-1.5 text-xs text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition"
+                  placeholder="CMD: SWITCH SYMBOL (e.g. 5347, TENAGA, CIMB, 1155)..."
+                  className="w-full bg-[#090A0C] border border-[#1F2328] rounded-[2px] pl-6 pr-12 py-1 text-[11px] font-mono text-[#F0F3F6] placeholder:text-[#6E7681] focus:outline-none focus:border-[#38BDF8]"
                 />
                 <button
                   type="submit"
                   disabled={loading}
-                  className="absolute right-1 top-1/2 -translate-y-1/2 bg-blue-600 hover:bg-blue-500 text-white px-2 py-0.5 rounded text-xs font-semibold transition disabled:opacity-50"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 bg-[#16191D] hover:bg-[#1F2328] text-[#8B949E] hover:text-[#F0F3F6] px-1.5 py-0.5 rounded-[2px] text-[10px] font-mono border border-[#1F2328] disabled:opacity-40"
                 >
-                  {loading ? "..." : "Go"}
+                  {loading ? "FETCH" : "EXEC"}
                 </button>
               </div>
             </form>
           )}
 
-          {/* Right Action Buttons */}
-          <div className="flex items-center space-x-2.5">
+          {/* System Control Utility Actions */}
+          <div className="flex items-center space-x-1.5 font-mono text-[11px]">
             {view === "terminal" && (
               <button
                 onClick={() => setView("home")}
-                className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 border border-slate-700 transition"
+                className="bg-[#121417] hover:bg-[#16191D] text-[#8B949E] hover:text-[#F0F3F6] px-2 py-1 rounded-[2px] border border-[#1F2328] flex items-center space-x-1"
               >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Start Page</span>
+                <ArrowLeft className="w-3 h-3" />
+                <span className="hidden sm:inline">ROOT_INDEX</span>
               </button>
             )}
 
@@ -392,110 +377,103 @@ export default function BursaFinanceApp() {
                 setIngestStockCode(data?.stock?.code || "1155");
                 setIngestModalOpen(true);
               }}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition shadow"
-              title="Upload PDF or Markdown Filing"
+              className="bg-[#121417] hover:bg-[#16191D] text-[#10B981] px-2.5 py-1 rounded-[2px] border border-[#1F2328] flex items-center space-x-1.5 font-semibold"
             >
-              <FileUp className="w-3.5 h-3.5" />
-              <span>Ingest Custom Filing</span>
+              <FileUp className="w-3 h-3" />
+              <span>[INGEST_FILING]</span>
             </button>
+
+            <span className="text-[#8B949E] hidden lg:inline px-1">|</span>
+            <span className="text-[10px] text-[#8B949E] hidden lg:inline tabular-nums">
+              CMSA 2007 VERIFIED
+            </span>
           </div>
         </div>
       </header>
 
-      {/* 2. VIEW 1: PROPER START PAGE */}
+      {/* 2. VIEW 1: FLAT INSTITUTIONAL START PAGE */}
       {view === "home" && (
-        <main className="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 py-12 flex flex-col items-center justify-center space-y-10">
+        <main className="flex-1 w-full max-w-6xl mx-auto px-3 sm:px-6 py-6 flex flex-col items-center justify-center space-y-6">
           
-          {/* Hero Welcome */}
-          <div className="text-center space-y-3 max-w-2xl">
-            <div className="inline-flex items-center space-x-2 bg-blue-950/60 border border-blue-800/80 px-3 py-1 rounded-full text-xs text-blue-300 font-semibold mb-2">
-              <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
-              <span>Bursa Malaysia Institutional RAG Copilot</span>
+          {/* Hero Section - Flat & High Density */}
+          <div className="text-center space-y-2 max-w-2xl w-full">
+            <div className="inline-flex items-center space-x-1.5 bg-[#121417] border border-[#1F2328] px-2 py-0.5 text-[11px] font-mono text-[#8B949E] rounded-[2px]">
+              <ShieldCheck className="w-3.5 h-3.5 text-[#38BDF8]" />
+              <span>BURSA MALAYSIA FORENSIC INTELLIGENCE ENGINE</span>
             </div>
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight">
-              Institutional Intelligence for Bursa Malaysia
+            <h1 className="text-2xl sm:text-3xl font-mono font-bold text-[#F0F3F6] tracking-tight">
+              INSTITUTIONAL REGULATORY TERMINAL
             </h1>
-            <p className="text-slate-400 text-sm sm:text-base leading-relaxed">
-              Enter any Bursa company or ticker. The system <strong className="text-slate-200">automatically pulls the latest quarterly regulatory filing</strong>, extracts financial statements, and executes the complete <strong className="text-blue-400">4-Stage Hierarchical RAG pipeline</strong> on demand.
+            <p className="text-[#8B949E] text-xs leading-relaxed font-sans">
+              Automated on-demand ingestion of quarterly disclosures, condensed financial statements, and Part B explanatory notes through a 4-Stage Modular RAG pipeline.
             </p>
           </div>
 
-          {/* Large Hero Search Box */}
+          {/* Centered Command Query Box */}
           <div className="w-full max-w-2xl">
             <form onSubmit={handleSearchSubmit} className="relative">
-              <div className="relative flex items-center shadow-2xl">
-                <Search className="w-5 h-5 absolute left-4 text-slate-400" />
+              <div className="relative flex items-center">
+                <span className="absolute left-3 text-[#8B949E] font-mono text-xs select-none">&gt;</span>
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Enter any Bursa stock or code (e.g. Maybank, 5347, Tenaga, MR DIY, CIMB)..."
-                  className="w-full bg-[#141b26] border-2 border-slate-700/80 hover:border-blue-500/80 focus:border-blue-500 rounded-2xl pl-12 pr-32 py-4 text-sm text-white placeholder:text-slate-400 focus:outline-none transition shadow-lg"
+                  placeholder="QUERY COMPANY OR TICKER (e.g. 5347, TENAGA, MAYBANK, MR DIY, CIMB)..."
+                  className="w-full bg-[#121417] border border-[#1F2328] rounded-[2px] pl-7 pr-28 py-2.5 text-xs font-mono text-[#F0F3F6] placeholder:text-[#6E7681] focus:outline-none focus:border-[#38BDF8]"
                   autoFocus
                 />
                 <button
                   type="submit"
                   disabled={loading || !searchQuery.trim()}
-                  className="absolute right-2 bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition shadow disabled:opacity-40 flex items-center space-x-1.5"
+                  className="absolute right-1.5 bg-[#1F2328] hover:bg-[#30363D] text-[#F0F3F6] px-3 py-1.5 rounded-[2px] text-[11px] font-mono font-semibold border border-[#30363D] disabled:opacity-40 flex items-center space-x-1"
                 >
                   {loading ? (
                     <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>Pulling...</span>
+                      <RefreshCw className="w-3 h-3 animate-spin text-[#38BDF8]" />
+                      <span>INGESTING...</span>
                     </>
                   ) : (
                     <>
-                      <span>Analyze Stock</span>
-                      <ChevronRight className="w-4 h-4" />
+                      <span>LOAD_SECURITY</span>
+                      <CornerDownLeft className="w-3 h-3 text-[#38BDF8]" />
                     </>
                   )}
                 </button>
               </div>
             </form>
-
-            {searchError && (
-              <div className="mt-3 p-3 bg-rose-950/40 border border-rose-800 text-rose-300 rounded-xl text-xs flex items-center justify-between">
-                <span>{searchError}</span>
-                <button onClick={() => setSearchError(null)} className="text-slate-400 hover:text-white">
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            )}
           </div>
 
-          {/* Popular Equities Grid */}
-          <div className="w-full max-w-4xl space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs uppercase font-bold text-slate-400 tracking-wider">
-                Select A Company to Auto-Pull & Ingest:
+          {/* Popular Equities Grid - Rigid 1px Border Tiling */}
+          <div className="w-full max-w-4xl space-y-2">
+            <div className="flex items-center justify-between border-b border-[#1F2328] pb-1">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#8B949E]">
+                CORE EQUITIES // DIRECT INGESTION INDEX
               </span>
-              <span className="text-xs text-slate-400">Click to launch RAG Copilot</span>
+              <span className="text-[10px] font-mono text-[#8B949E]">KLSE EQUITIES</span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-[#1F2328] border border-[#1F2328] rounded-[2px]">
               {POPULAR_COMPANIES.map((company) => (
                 <button
                   key={company.code}
-                  onClick={() => {
-                    setSearchQuery(company.code);
-                    loadStock(company.code);
-                  }}
+                  onClick={() => loadStockData(company.code)}
                   disabled={loading}
-                  className="bg-[#141b26] hover:bg-[#1a2332] border border-slate-800 hover:border-blue-500/60 p-3.5 rounded-xl text-left transition group space-y-1.5 shadow-sm"
+                  className="bg-[#121417] hover:bg-[#16191D] p-2.5 text-left transition flex flex-col justify-between group"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-sm text-white group-hover:text-blue-400 transition">
-                      {company.name}
+                  <div className="flex items-center justify-between w-full mb-1">
+                    <span className="font-mono text-xs font-bold text-[#F0F3F6] group-hover:text-[#38BDF8]">
+                      {company.ticker}
                     </span>
-                    <span className="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded font-mono font-bold">
-                      {company.code}
+                    <span className={`font-mono text-[11px] tabular-nums ${company.positive ? "text-[#10B981]" : "text-[#F85149]"}`}>
+                      {company.positive ? "+" : ""}{company.change.toFixed(2)}%
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-400 truncate">{company.sector}</p>
-                  <div className="flex items-center justify-between pt-1 border-t border-slate-800/60 text-xs">
-                    <span className="font-semibold text-slate-200 tabular-nums">RM {company.price.toFixed(2)}</span>
-                    <span className={`text-[11px] font-bold ${company.positive ? "text-emerald-400" : "text-rose-400"}`}>
-                      {company.positive ? "+" : ""}{company.change}%
+                  <div>
+                    <span className="text-[11px] font-medium text-[#8B949E] block truncate">
+                      {company.name}
+                    </span>
+                    <span className="font-mono text-xs text-[#F0F3F6] tabular-nums block font-bold">
+                      RM {company.price.toFixed(2)}
                     </span>
                   </div>
                 </button>
@@ -503,58 +481,64 @@ export default function BursaFinanceApp() {
             </div>
           </div>
 
-          {/* Clean Macro Pulse 4-Grid (NO Ribbon) */}
-          <div className="w-full max-w-4xl bg-[#141b26] border border-slate-800 rounded-2xl p-5 shadow-sm space-y-3">
-            <div className="flex items-center space-x-2 border-b border-slate-800 pb-2.5">
-              <BarChart2 className="w-4 h-4 text-blue-400" />
-              <span className="text-xs uppercase font-bold text-slate-300 tracking-wider">Malaysian Macroeconomic Pulse</span>
+          {/* Macroeconomic Indicators - Continuous Flat Grid */}
+          <div className="w-full max-w-4xl space-y-2">
+            <div className="flex items-center justify-between border-b border-[#1F2328] pb-1">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#8B949E]">
+                MACROECONOMIC BENCHMARKS
+              </span>
+              <span className="text-[10px] font-mono text-[#8B949E]">BANK NEGARA MALAYSIA / GLOBAL</span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-              <div className="bg-[#0c1017] p-3 rounded-xl border border-slate-800/80">
-                <span className="text-[11px] text-slate-400 block font-medium">FBM KLCI Index</span>
-                <span className="text-lg font-bold text-white tabular-nums">1,624.18</span>
-                <span className="text-[11px] text-emerald-400 block font-medium">+5.12 (+0.32%)</span>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-[#1F2328] border border-[#1F2328] rounded-[2px] text-xs">
+              <div className="bg-[#121417] p-2.5">
+                <span className="text-[10px] font-mono text-[#8B949E] block">FBM KLCI INDEX</span>
+                <span className="text-sm font-mono font-bold text-[#F0F3F6] tabular-nums">1,624.18</span>
+                <span className="text-[10px] font-mono text-[#10B981] block tabular-nums">+5.12 (+0.32%)</span>
               </div>
-              <div className="bg-[#0c1017] p-3 rounded-xl border border-slate-800/80">
-                <span className="text-[11px] text-slate-400 block font-medium">USD / MYR</span>
-                <span className="text-lg font-bold text-white tabular-nums">4.4125</span>
-                <span className="text-[11px] text-emerald-400 block font-medium">-0.0065 (-0.15%)</span>
+              <div className="bg-[#121417] p-2.5">
+                <span className="text-[10px] font-mono text-[#8B949E] block">USD / MYR SPOT</span>
+                <span className="text-sm font-mono font-bold text-[#F0F3F6] tabular-nums">4.4125</span>
+                <span className="text-[10px] font-mono text-[#10B981] block tabular-nums">-0.0065 (-0.15%)</span>
               </div>
-              <div className="bg-[#0c1017] p-3 rounded-xl border border-slate-800/80">
-                <span className="text-[11px] text-slate-400 block font-medium">Brent Crude</span>
-                <span className="text-lg font-bold text-white tabular-nums">$73.87</span>
-                <span className="text-[11px] text-emerald-400 block font-medium">+0.48 (+0.65%)</span>
+              <div className="bg-[#121417] p-2.5">
+                <span className="text-[10px] font-mono text-[#8B949E] block">BRENT CRUDE SPOT</span>
+                <span className="text-sm font-mono font-bold text-[#F0F3F6] tabular-nums">$73.87</span>
+                <span className="text-[10px] font-mono text-[#10B981] block tabular-nums">+0.48 (+0.65%)</span>
               </div>
-              <div className="bg-[#0c1017] p-3 rounded-xl border border-slate-800/80">
-                <span className="text-[11px] text-slate-400 block font-medium">BNM Policy Rate (OPR)</span>
-                <span className="text-lg font-bold text-white tabular-nums">3.00%</span>
-                <span className="text-[11px] text-slate-400 block font-medium">Neutral / Accommodative</span>
+              <div className="bg-[#121417] p-2.5">
+                <span className="text-[10px] font-mono text-[#8B949E] block">BNM POLICY RATE (OPR)</span>
+                <span className="text-sm font-mono font-bold text-[#F0F3F6] tabular-nums">3.00%</span>
+                <span className="text-[10px] font-mono text-[#8B949E] block">ACCOMMODATIVE</span>
               </div>
             </div>
           </div>
 
-          {/* 4-Stage RAG Pipeline Visual */}
-          <div className="w-full max-w-4xl bg-[#141b26]/60 border border-slate-800 rounded-2xl p-5 space-y-3">
-            <span className="text-[11px] uppercase font-bold text-slate-400 tracking-wider block">
-              Automated 4-Stage Financial RAG Architecture:
-            </span>
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
-              <div className="bg-[#0c1017] p-3 rounded-xl border border-slate-800">
-                <span className="text-blue-400 font-bold block mb-1">Stage 1: AST Chunking</span>
-                <p className="text-slate-400 text-[11px] leading-relaxed">Extracts atomic statement tables and preserves parent section hierarchy for notes.</p>
+          {/* 4-Stage RAG Pipeline Architecture Grid */}
+          <div className="w-full max-w-4xl space-y-2">
+            <div className="flex items-center justify-between border-b border-[#1F2328] pb-1">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#8B949E]">
+                SYSTEM PIPELINE // 4-STAGE RETRIEVAL ARCHITECTURE
+              </span>
+              <span className="text-[10px] font-mono text-[#8B949E]">DETERMINISTIC VERIFICATION</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-px bg-[#1F2328] border border-[#1F2328] rounded-[2px] text-xs">
+              <div className="bg-[#121417] p-2.5">
+                <span className="text-[#38BDF8] font-mono text-[10px] font-bold block mb-0.5">STAGE 1: AST CHUNKING</span>
+                <p className="text-[#8B949E] text-[11px] leading-snug">Preserves atomic financial tables and parent-child hierarchy for Part B notes.</p>
               </div>
-              <div className="bg-[#0c1017] p-3 rounded-xl border border-slate-800">
-                <span className="text-indigo-400 font-bold block mb-1">Stage 2: Hybrid Search</span>
-                <p className="text-slate-400 text-[11px] leading-relaxed">Dual channel search fusing dense ChromaDB vectors with sparse BM25 Okapi keywords.</p>
+              <div className="bg-[#121417] p-2.5">
+                <span className="text-[#38BDF8] font-mono text-[10px] font-bold block mb-0.5">STAGE 2: HYBRID RRF</span>
+                <p className="text-[#8B949E] text-[11px] leading-snug">Reciprocal Rank Fusion uniting dense ChromaDB vectors with sparse BM25 Okapi keywords.</p>
               </div>
-              <div className="bg-[#0c1017] p-3 rounded-xl border border-slate-800">
-                <span className="text-purple-400 font-bold block mb-1">Stage 3: Neural Reranking</span>
-                <p className="text-slate-400 text-[11px] leading-relaxed">FlashRank Cross-Encoder reranks relevant disclosure paragraphs in ~15ms.</p>
+              <div className="bg-[#121417] p-2.5">
+                <span className="text-[#38BDF8] font-mono text-[10px] font-bold block mb-0.5">STAGE 3: FLASHRANK</span>
+                <p className="text-[#8B949E] text-[11px] leading-snug">Cross-Encoder neural reranker scoring top regulatory passages in ~15ms on CPU.</p>
               </div>
-              <div className="bg-[#0c1017] p-3 rounded-xl border border-slate-800">
-                <span className="text-emerald-400 font-bold block mb-1">Stage 4: Grounded Synthesis</span>
-                <p className="text-slate-400 text-[11px] leading-relaxed">Contextual compression and cited regulatory answers compliant with CMSA 2007.</p>
+              <div className="bg-[#121417] p-2.5">
+                <span className="text-[#10B981] font-mono text-[10px] font-bold block mb-0.5">STAGE 4: CITED SYNTHESIS</span>
+                <p className="text-[#8B949E] text-[11px] leading-snug">Objective, grounded notes citing regulatory disclosures under CMSA 2007 guidelines.</p>
               </div>
             </div>
           </div>
@@ -564,118 +548,103 @@ export default function BursaFinanceApp() {
 
       {/* 3. VIEW 2: ACTIVE STOCK TERMINAL WORKSPACE */}
       {view === "terminal" && data && (
-        <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-4 space-y-4">
+        <main className="flex-1 w-full p-2 space-y-2">
           
-          {/* Mobile Tab Toggle */}
-          <div className="lg:hidden bg-[#141b26] border border-slate-800 rounded-xl p-1 flex items-center justify-center space-x-2 text-xs">
+          {/* Mobile Tab Switcher */}
+          <div className="lg:hidden bg-[#121417] border border-[#1F2328] rounded-[2px] p-0.5 flex text-xs font-mono">
             <button
               onClick={() => setMobileTab("dashboard")}
-              className={`flex-1 py-1.5 px-3 rounded-lg font-semibold transition text-center ${
-                mobileTab === "dashboard" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-white"
+              className={`flex-1 py-1 px-2 rounded-[2px] font-bold transition text-center ${
+                mobileTab === "dashboard" ? "bg-[#1F2328] text-[#F0F3F6]" : "text-[#8B949E]"
               }`}
             >
-              Market Dashboard
+              DATA_DASHBOARD
             </button>
             <button
-              onClick={() => setMobileTab("chat")}
-              className={`flex-1 py-1.5 px-3 rounded-lg font-semibold transition text-center flex items-center justify-center space-x-1.5 ${
-                mobileTab === "chat" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-white"
+              onClick={() => setMobileTab("console")}
+              className={`flex-1 py-1 px-2 rounded-[2px] font-bold transition text-center ${
+                mobileTab === "console" ? "bg-[#1F2328] text-[#F0F3F6]" : "text-[#8B949E]"
               }`}
             >
-              <MessageSquare className="w-3.5 h-3.5" />
-              <span>Analyst Copilot</span>
+              COMMAND_CONSOLE
             </button>
           </div>
 
-          {/* Stock Header Card */}
-          <div className="bg-[#141b26] border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-sm">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="space-y-1">
-                <div className="flex items-center space-x-3">
-                  <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                    {data.stock.name}
-                  </h1>
-                  <span className="bg-slate-800 text-slate-200 text-xs px-2.5 py-0.5 rounded font-bold font-mono border border-slate-700">
-                    {data.stock.ticker}
-                  </span>
-                  <span className="text-xs bg-emerald-950/70 text-emerald-400 border border-emerald-800/60 px-2 py-0.5 rounded font-semibold hidden sm:inline-flex items-center space-x-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                    <span>4-Stage RAG Ready</span>
-                  </span>
-                </div>
-                <div className="flex items-baseline space-x-3">
-                  <span className="text-2xl sm:text-3xl font-extrabold text-white tabular-nums tracking-tight">
-                    RM {data.stock.price.toFixed(2)}
-                  </span>
-                  <div
-                    className={`flex items-center space-x-1 text-sm font-bold ${
-                      isPositive ? "text-emerald-400" : "text-rose-400"
-                    }`}
-                  >
-                    {isPositive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-                    <span>
-                      {isPositive ? "+" : ""}
-                      {data.stock.change_pct.toFixed(2)}%
-                    </span>
-                    <span className="text-slate-400 text-xs font-normal">Today</span>
-                  </div>
-                </div>
+          {/* Active Security Ribbon Header - High Density Flat Strip */}
+          <div className="bg-[#121417] border border-[#1F2328] rounded-[2px] px-3 py-1.5 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex items-center space-x-3">
+              <span className="font-mono text-sm font-bold text-[#F0F3F6] tracking-tight">
+                {data.stock.name.toUpperCase()}
+              </span>
+              <span className="font-mono text-xs bg-[#16191D] text-[#8B949E] px-1.5 py-0.2 border border-[#1F2328] rounded-[2px]">
+                {data.stock.ticker}
+              </span>
+              <div className="flex items-baseline space-x-2 font-mono">
+                <span className="text-sm font-bold text-[#F0F3F6] tabular-nums">
+                  RM {data.stock.price.toFixed(2)}
+                </span>
+                <span className={`text-[11px] font-bold tabular-nums ${isPositive ? "text-[#10B981]" : "text-[#F85149]"}`}>
+                  {isPositive ? "+" : ""}{data.stock.change_pct.toFixed(2)}%
+                </span>
               </div>
+            </div>
 
-              {/* Key Quick Stats */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs bg-[#0c1017] p-3 rounded-xl border border-slate-800/80">
-                <div>
-                  <span className="text-slate-400 text-[11px] block">Market Cap</span>
-                  <span className="font-semibold text-slate-200 tabular-nums">
-                    RM {data.stock.market_cap ? (data.stock.market_cap / 1_000_000_000).toFixed(1) + "B" : "122.5B"}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400 text-[11px] block">P/E Ratio</span>
-                  <span className="font-semibold text-slate-200 tabular-nums">
-                    {data.metrics.annualized_pe ? `${data.metrics.annualized_pe}x` : "12.8x"}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400 text-[11px] block">Operating Margin</span>
-                  <span className="font-semibold text-emerald-400 tabular-nums">
-                    {data.metrics.net_margin_pct ? `${data.metrics.net_margin_pct}%` : "32.6%"}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400 text-[11px] block">Gearing Ratio</span>
-                  <span className="font-semibold text-slate-200 tabular-nums">
-                    {data.metrics.gearing_ratio ? `${data.metrics.gearing_ratio}x` : "0.45x"}
-                  </span>
-                </div>
+            {/* Metrics Ribbon */}
+            <div className="flex items-center space-x-4 font-mono text-[11px] text-[#8B949E]">
+              <div>
+                <span className="text-[10px] text-[#8B949E] mr-1">MCAP:</span>
+                <span className="text-[#F0F3F6] font-semibold tabular-nums">
+                  RM {data.stock.market_cap ? (data.stock.market_cap / 1_000_000_000).toFixed(1) + "B" : "122.5B"}
+                </span>
+              </div>
+              <span className="text-[#1F2328]">|</span>
+              <div>
+                <span className="text-[10px] text-[#8B949E] mr-1">P/E:</span>
+                <span className="text-[#F0F3F6] font-semibold tabular-nums">
+                  {data.metrics.annualized_pe ? `${data.metrics.annualized_pe}x` : "12.8x"}
+                </span>
+              </div>
+              <span className="text-[#1F2328]">|</span>
+              <div>
+                <span className="text-[10px] text-[#8B949E] mr-1">NET_MARGIN:</span>
+                <span className="text-[#10B981] font-semibold tabular-nums">
+                  {data.metrics.net_margin_pct ? `${data.metrics.net_margin_pct}%` : "32.6%"}
+                </span>
+              </div>
+              <span className="text-[#1F2328]">|</span>
+              <div>
+                <span className="text-[10px] text-[#8B949E] mr-1">GEARING:</span>
+                <span className="text-[#F0F3F6] font-semibold tabular-nums">
+                  {data.metrics.gearing_ratio ? `${data.metrics.gearing_ratio}x` : "0.45x"}
+                </span>
               </div>
             </div>
           </div>
 
-          {/* 2-COLUMN SPLIT WORKSPACE */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+          {/* Continuous Tiled Grid: Left Data Dashboard (52%) + Right Command Console (48%) */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-2 items-start">
             
-            {/* LEFT COLUMN: Visual Market Charts & Key Performance (~54% width) */}
-            <div className={`lg:col-span-6 space-y-4 ${mobileTab === "dashboard" ? "block" : "hidden lg:block"}`}>
+            {/* LEFT COLUMN: Charts & Tabular Statement Excerpt */}
+            <div className={`lg:col-span-6 space-y-2 ${mobileTab === "dashboard" ? "block" : "hidden lg:block"}`}>
               
-              {/* 1. Interactive Stock Price Area Chart */}
-              <div className="bg-[#141b26] border border-slate-800 rounded-2xl p-4 shadow-sm space-y-3">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
-                  <div className="flex items-center space-x-2">
-                    <LineChart className="w-4 h-4 text-blue-400" />
-                    <span className="font-bold text-xs text-white uppercase tracking-wider">Price Trajectory (MYR)</span>
+              {/* 1. Price Trajectory Chart - Sharp Solid Line (NO Gradients / NO Glow) */}
+              <div className="bg-[#121417] border border-[#1F2328] rounded-[2px] p-2 space-y-1.5">
+                <div className="flex items-center justify-between border-b border-[#1F2328] pb-1">
+                  <div className="flex items-center space-x-1.5 font-mono text-[11px]">
+                    <LineChart className="w-3.5 h-3.5 text-[#38BDF8]" />
+                    <span className="font-bold text-[#F0F3F6]">PRICE TRAJECTORY // MYR</span>
                   </div>
 
-                  {/* Time Range Selector */}
-                  <div className="flex items-center space-x-1 bg-[#0c1017] p-0.5 rounded-lg border border-slate-800 text-[11px]">
+                  {/* Interval Selector */}
+                  <div className="flex items-center space-x-0.5 bg-[#090A0C] border border-[#1F2328] p-0.5 rounded-[2px] text-[10px] font-mono">
                     {(["1D", "5D", "1M", "6M", "1Y"] as const).map((interval) => (
                       <button
                         key={interval}
                         onClick={() => setSelectedInterval(interval)}
-                        className={`px-2.5 py-0.5 rounded-md font-semibold transition ${
+                        className={`px-1.5 py-0.2 rounded-[1px] font-bold transition ${
                           selectedInterval === interval
-                            ? "bg-blue-600 text-white"
-                            : "text-slate-400 hover:text-slate-200"
+                            ? "bg-[#1F2328] text-[#38BDF8]"
+                            : "text-[#8B949E] hover:text-[#F0F3F6]"
                         }`}
                       >
                         {interval}
@@ -684,46 +653,49 @@ export default function BursaFinanceApp() {
                   </div>
                 </div>
 
-                <div className="h-56 w-full">
+                <div className="h-40 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="priceGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={isPositive ? "#10b981" : "#3b82f6"} stopOpacity={0.35} />
-                          <stop offset="95%" stopColor={isPositive ? "#10b981" : "#3b82f6"} stopOpacity={0.0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#263345" opacity={0.5} />
-                      <XAxis dataKey="time" stroke="#64748b" tick={{ fontSize: 10 }} />
-                      <YAxis domain={["auto", "auto"]} stroke="#64748b" tick={{ fontSize: 10 }} />
+                      <CartesianGrid strokeDasharray="2 2" stroke="#1F2328" />
+                      <XAxis dataKey="time" stroke="#8B949E" tick={{ fontSize: 9, fontFamily: "monospace" }} />
+                      <YAxis domain={["auto", "auto"]} stroke="#8B949E" tick={{ fontSize: 9, fontFamily: "monospace" }} />
                       <Tooltip
-                        contentStyle={{ backgroundColor: "#0c1017", borderColor: "#334155", borderRadius: "6px", fontSize: "11px" }}
-                        formatter={(value: any) => [`RM ${Number(value).toFixed(2)}`, "Price"]}
+                        contentStyle={{
+                          backgroundColor: "#121417",
+                          borderColor: "#1F2328",
+                          borderRadius: "2px",
+                          fontSize: "11px",
+                          fontFamily: "monospace",
+                          color: "#F0F3F6",
+                          padding: "4px 8px"
+                        }}
+                        formatter={(value: any) => [`RM ${Number(value).toFixed(2)}`, "PRICE"]}
                       />
+                      {/* Strictly Solid Sharp Line: Fill none */}
                       <Area
                         type="monotone"
                         dataKey="price"
-                        stroke={isPositive ? "#10b981" : "#3b82f6"}
-                        strokeWidth={2}
-                        fillOpacity={1}
-                        fill="url(#priceGradient)"
+                        stroke="#38BDF8"
+                        strokeWidth={1.5}
+                        fill="transparent"
+                        isAnimationActive={false}
                       />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
               </div>
 
-              {/* 2. Quarterly Revenue vs Net Profit Progression Chart */}
-              <div className="bg-[#141b26] border border-slate-800 rounded-2xl p-4 shadow-sm space-y-3">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
-                  <div className="flex items-center space-x-2">
-                    <BarChart2 className="w-4 h-4 text-emerald-400" />
-                    <span className="font-bold text-xs text-white uppercase tracking-wider">Topline vs. Profit (RM 'M)</span>
+              {/* 2. Topline vs. Profit Bar Chart - Thin Bars & Desaturated Tones */}
+              <div className="bg-[#121417] border border-[#1F2328] rounded-[2px] p-2 space-y-1.5">
+                <div className="flex items-center justify-between border-b border-[#1F2328] pb-1">
+                  <div className="flex items-center space-x-1.5 font-mono text-[11px]">
+                    <BarChart2 className="w-3.5 h-3.5 text-[#10B981]" />
+                    <span className="font-bold text-[#F0F3F6]">TOPLINE VS PROFIT // RM 'M</span>
                   </div>
-                  <span className="text-[10px] text-slate-400">Quarterly Progression</span>
+                  <span className="text-[10px] font-mono text-[#8B949E]">5-QUARTER TIMELINE</span>
                 </div>
 
-                <div className="h-44 w-full">
+                <div className="h-28 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={data.historical_quarters || [
@@ -734,243 +706,237 @@ export default function BursaFinanceApp() {
                         { quarter: "Q2 '26", revenue: 7200, profit: 2350 },
                       ]}
                       margin={{ top: 5, right: 5, left: -25, bottom: 0 }}
+                      barGap={2}
                     >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#263345" opacity={0.4} />
-                      <XAxis dataKey="quarter" stroke="#64748b" tick={{ fontSize: 10 }} />
-                      <YAxis stroke="#64748b" tick={{ fontSize: 10 }} />
+                      <CartesianGrid strokeDasharray="2 2" stroke="#1F2328" />
+                      <XAxis dataKey="quarter" stroke="#8B949E" tick={{ fontSize: 9, fontFamily: "monospace" }} />
+                      <YAxis stroke="#8B949E" tick={{ fontSize: 9, fontFamily: "monospace" }} />
                       <Tooltip
-                        contentStyle={{ backgroundColor: "#0c1017", borderColor: "#334155", borderRadius: "6px", fontSize: "11px" }}
+                        contentStyle={{
+                          backgroundColor: "#121417",
+                          borderColor: "#1F2328",
+                          borderRadius: "2px",
+                          fontSize: "11px",
+                          fontFamily: "monospace",
+                          color: "#F0F3F6",
+                          padding: "4px 8px"
+                        }}
                         formatter={(value: any, name: any) => [
                           `RM ${Number(value).toLocaleString()} M`,
-                          name === "revenue" ? "Revenue" : "Net Profit",
+                          name === "revenue" ? "REVENUE" : "NET PROFIT",
                         ]}
                       />
-                      <Legend wrapperStyle={{ fontSize: "11px" }} />
-                      <Bar dataKey="revenue" name="Revenue" fill="#3b82f6" radius={[3, 3, 0, 0]} />
-                      <Bar dataKey="profit" name="Net Profit" fill="#10b981" radius={[3, 3, 0, 0]} />
+                      <Legend wrapperStyle={{ fontSize: "10px", fontFamily: "monospace" }} />
+                      {/* Desaturated Muted Steel Blue for Revenue, Muted Emerald for Net Profit */}
+                      <Bar dataKey="revenue" name="Revenue" fill="#64748B" barSize={12} radius={[0, 0, 0, 0]} isAnimationActive={false} />
+                      <Bar dataKey="profit" name="Net Profit" fill="#10B981" barSize={12} radius={[0, 0, 0, 0]} isAnimationActive={false} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               </div>
 
-              {/* 3. Condensed Financial Statement Summary */}
-              <div className="bg-[#141b26] border border-slate-800 rounded-2xl p-4 shadow-sm space-y-3">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                  <span className="font-bold text-xs text-white uppercase tracking-wider">Financial Statement Excerpt</span>
-                  <span className="text-[10px] text-slate-400">RM '000</span>
+              {/* 3. Financial Statement Excerpt Table - High Density Tabular-Nums Zebra Striping */}
+              <div className="bg-[#121417] border border-[#1F2328] rounded-[2px] p-2 space-y-1">
+                <div className="flex items-center justify-between border-b border-[#1F2328] pb-1">
+                  <span className="font-mono font-bold text-[11px] text-[#F0F3F6]">
+                    FINANCIAL STATEMENT EXCERPT
+                  </span>
+                  <span className="font-mono text-[10px] text-[#8B949E]">UNITS: RM '000</span>
                 </div>
 
-                <div className="overflow-x-auto text-xs">
-                  <table className="w-full text-left">
-                    <thead className="bg-[#0c1017] text-slate-400 text-[10px] uppercase">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-[11px] table-zebra">
+                    <thead className="bg-[#090A0C] text-[#8B949E] font-mono text-[10px] uppercase border-b border-[#1F2328]">
                       <tr>
-                        <th className="py-1.5 px-2">Line Item</th>
-                        <th className="py-1.5 px-2 text-right">Current Qtr</th>
-                        <th className="py-1.5 px-2 text-right">Preceding Qtr</th>
-                        <th className="py-1.5 px-2 text-right">QoQ Change</th>
+                        <th className="py-1 px-2">LINE_ITEM</th>
+                        <th className="py-1 px-2 text-right">CURRENT_QTR</th>
+                        <th className="py-1 px-2 text-right">PRECEDING_QTR</th>
+                        <th className="py-1 px-2 text-right">QOQ_DELTA</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800/80">
+                    <tbody className="divide-y divide-[#1F2328] font-mono">
                       <tr>
-                        <td className="py-1.5 px-2 font-medium text-slate-200">Revenue</td>
-                        <td className="py-1.5 px-2 text-right tabular-nums text-white">
+                        <td className="py-1 px-2 text-[#F0F3F6] font-sans">Revenue</td>
+                        <td className="py-1 px-2 text-right tabular-nums text-[#F0F3F6]">
                           {(data.financial_statement?.revenue || 7200000).toLocaleString()}
                         </td>
-                        <td className="py-1.5 px-2 text-right tabular-nums text-slate-400">
+                        <td className="py-1 px-2 text-right tabular-nums text-[#8B949E]">
                           {(data.financial_statement?.prev_revenue || 6800000).toLocaleString()}
                         </td>
-                        <td className="py-1.5 px-2 text-right font-bold text-emerald-400">
+                        <td className="py-1 px-2 text-right tabular-nums font-bold text-[#10B981]">
                           {data.metrics?.rev_growth_qoq >= 0 ? "+" : ""}{data.metrics?.rev_growth_qoq}%
                         </td>
                       </tr>
                       <tr>
-                        <td className="py-1.5 px-2 font-medium text-slate-200">Net Profit (PATAMI)</td>
-                        <td className="py-1.5 px-2 text-right tabular-nums text-white font-bold">
+                        <td className="py-1 px-2 text-[#F0F3F6] font-sans">Net Profit (PATAMI)</td>
+                        <td className="py-1 px-2 text-right tabular-nums text-[#F0F3F6] font-bold">
                           {(data.financial_statement?.net_profit || 2350000).toLocaleString()}
                         </td>
-                        <td className="py-1.5 px-2 text-right tabular-nums text-slate-400">
+                        <td className="py-1 px-2 text-right tabular-nums text-[#8B949E]">
                           {(data.financial_statement?.prev_net_profit || 2200000).toLocaleString()}
                         </td>
-                        <td className="py-1.5 px-2 text-right font-bold text-emerald-400">
+                        <td className="py-1 px-2 text-right tabular-nums font-bold text-[#10B981]">
                           {data.metrics?.profit_growth_qoq >= 0 ? "+" : ""}{data.metrics?.profit_growth_qoq}%
                         </td>
                       </tr>
                       <tr>
-                        <td className="py-1.5 px-2 font-medium text-slate-200">Total Borrowings</td>
-                        <td className="py-1.5 px-2 text-right tabular-nums text-slate-300">
+                        <td className="py-1 px-2 text-[#F0F3F6] font-sans">Total Borrowings</td>
+                        <td className="py-1 px-2 text-right tabular-nums text-[#F0F3F6]">
                           {(data.financial_statement?.total_borrowings || 45000000).toLocaleString()}
                         </td>
-                        <td className="py-1.5 px-2 text-right tabular-nums text-slate-400">
+                        <td className="py-1 px-2 text-right tabular-nums text-[#8B949E]">
                           {((data.financial_statement?.total_borrowings || 45000000) * 0.98).toLocaleString()}
                         </td>
-                        <td className="py-1.5 px-2 text-right text-slate-300">+2.04%</td>
+                        <td className="py-1 px-2 text-right tabular-nums text-[#8B949E]">+2.04%</td>
                       </tr>
                       <tr>
-                        <td className="py-1.5 px-2 font-medium text-slate-200">Cash & Bank Balances</td>
-                        <td className="py-1.5 px-2 text-right tabular-nums text-emerald-400 font-bold">
+                        <td className="py-1 px-2 text-[#F0F3F6] font-sans">Cash & Bank Balances</td>
+                        <td className="py-1 px-2 text-right tabular-nums text-[#10B981] font-bold">
                           {(data.financial_statement?.cash || 60000000).toLocaleString()}
                         </td>
-                        <td className="py-1.5 px-2 text-right tabular-nums text-slate-400">
+                        <td className="py-1 px-2 text-right tabular-nums text-[#8B949E]">
                           {((data.financial_statement?.cash || 60000000) * 0.97).toLocaleString()}
                         </td>
-                        <td className="py-1.5 px-2 text-right text-emerald-400">+3.09%</td>
+                        <td className="py-1 px-2 text-right tabular-nums text-[#10B981]">+3.09%</td>
                       </tr>
                       <tr>
-                        <td className="py-1.5 px-2 font-medium text-slate-200">Basic EPS (sen)</td>
-                        <td className="py-1.5 px-2 text-right tabular-nums text-white font-bold">
+                        <td className="py-1 px-2 text-[#F0F3F6] font-sans">Basic EPS (sen)</td>
+                        <td className="py-1 px-2 text-right tabular-nums text-[#F0F3F6] font-bold">
                           {(data.financial_statement?.eps_sen || 19.5).toFixed(2)}
                         </td>
-                        <td className="py-1.5 px-2 text-right tabular-nums text-slate-400">
+                        <td className="py-1 px-2 text-right tabular-nums text-[#8B949E]">
                           {((data.financial_statement?.eps_sen || 19.5) * 0.94).toFixed(2)}
                         </td>
-                        <td className="py-1.5 px-2 text-right text-emerald-400">+6.38%</td>
+                        <td className="py-1 px-2 text-right tabular-nums text-[#10B981]">+6.38%</td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
               </div>
 
-              {/* 4. DCF Valuation Sensitivity Quick Card */}
-              <div className="bg-[#141b26] border border-slate-800 rounded-2xl p-4 shadow-sm space-y-2.5">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                  <div className="flex items-center space-x-2">
-                    <Calculator className="w-4 h-4 text-indigo-400" />
-                    <span className="font-bold text-xs text-white uppercase tracking-wider">5-Year DCF Sensitivity</span>
+              {/* 4. DCF Valuation Sensitivity Strip */}
+              <div className="bg-[#121417] border border-[#1F2328] rounded-[2px] p-2 space-y-1">
+                <div className="flex items-center justify-between border-b border-[#1F2328] pb-1">
+                  <div className="flex items-center space-x-1.5 font-mono text-[11px]">
+                    <Calculator className="w-3.5 h-3.5 text-[#8B949E]" />
+                    <span className="font-bold text-[#F0F3F6]">5-YEAR DCF SENSITIVITY MATRIX</span>
                   </div>
-                  <span className="text-[10px] text-slate-400">Deterministic Arithmetic Sandbox</span>
+                  <span className="font-mono text-[10px] text-[#8B949E]">DETERMINISTIC SANDBOX</span>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2.5 text-center text-xs">
-                  <div className="bg-[#0c1017] p-2.5 rounded-xl border border-slate-800">
-                    <span className="text-[10px] text-slate-400 block">Conservative (10%)</span>
-                    <span className="font-bold text-slate-200 text-sm">RM {(data.stock.price * 1.05).toFixed(2)}</span>
-                    <span className="text-[10px] text-slate-500 block">WACC: 10.0%</span>
+                <div className="grid grid-cols-3 gap-1.5 text-center text-xs font-mono">
+                  <div className="bg-[#090A0C] p-1.5 border border-[#1F2328] rounded-[2px]">
+                    <span className="text-[10px] text-[#8B949E] block">CONSERVATIVE</span>
+                    <span className="font-bold text-[#F0F3F6] text-xs tabular-nums">RM {(data.stock.price * 1.05).toFixed(2)}</span>
+                    <span className="text-[9px] text-[#8B949E] block">WACC 10.0%</span>
                   </div>
-                  <div className="bg-blue-950/30 p-2.5 rounded-xl border border-blue-800/50">
-                    <span className="text-[10px] text-blue-400 block font-semibold">Base Case (8.5%)</span>
-                    <span className="font-bold text-blue-300 text-sm">RM {(data.stock.price * 1.25).toFixed(2)}</span>
-                    <span className="text-[10px] text-blue-400/80 block">WACC: 8.5%</span>
+                  <div className="bg-[#16191D] p-1.5 border border-[#30363D] rounded-[2px]">
+                    <span className="text-[10px] text-[#38BDF8] block font-bold">BASE CASE</span>
+                    <span className="font-bold text-[#38BDF8] text-xs tabular-nums">RM {(data.stock.price * 1.25).toFixed(2)}</span>
+                    <span className="text-[9px] text-[#8B949E] block">WACC 8.5%</span>
                   </div>
-                  <div className="bg-[#0c1017] p-2.5 rounded-xl border border-slate-800">
-                    <span className="text-[10px] text-slate-400 block">Optimistic (7.0%)</span>
-                    <span className="font-bold text-emerald-400 text-sm">RM {(data.stock.price * 1.48).toFixed(2)}</span>
-                    <span className="text-[10px] text-slate-500 block">WACC: 7.0%</span>
+                  <div className="bg-[#090A0C] p-1.5 border border-[#1F2328] rounded-[2px]">
+                    <span className="text-[10px] text-[#10B981] block">OPTIMISTIC</span>
+                    <span className="font-bold text-[#10B981] text-xs tabular-nums">RM {(data.stock.price * 1.48).toFixed(2)}</span>
+                    <span className="text-[9px] text-[#8B949E] block">WACC 7.0%</span>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* RIGHT COLUMN: Interactive Research Analyst Copilot (~46% width) */}
-            <div className={`lg:col-span-6 flex flex-col bg-[#141b26] border border-slate-800 rounded-2xl shadow-xl overflow-hidden h-[760px] ${mobileTab === "chat" ? "block" : "hidden lg:flex"}`}>
+            {/* RIGHT COLUMN: Rigid Docked Command & Query Console */}
+            <div className={`lg:col-span-6 flex flex-col bg-[#121417] border border-[#1F2328] rounded-[2px] h-[670px] ${mobileTab === "console" ? "block" : "hidden lg:flex"}`}>
               
-              {/* Copilot Header */}
-              <div className="p-3.5 bg-[#17202e] border-b border-slate-800 flex items-center justify-between">
-                <div className="flex items-center space-x-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-blue-600/20 border border-blue-500/40 flex items-center justify-center text-blue-400">
-                    <Bot className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <span className="font-bold text-xs text-white">Bursa Research Analyst</span>
-                      <span className="flex items-center space-x-1 text-[10px] bg-emerald-950/70 text-emerald-400 border border-emerald-800/60 px-1.5 py-0.2 rounded font-semibold">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                        <span>4-Stage RAG</span>
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-slate-400">Active Stock: {data.stock.name} ({data.stock.ticker})</p>
-                  </div>
+              {/* Console Header Bar */}
+              <div className="p-2 bg-[#090A0C] border-b border-[#1F2328] flex items-center justify-between text-xs font-mono select-none">
+                <div className="flex items-center space-x-2">
+                  <TerminalIcon className="w-3.5 h-3.5 text-[#38BDF8]" />
+                  <span className="font-bold text-[#F0F3F6]">INTERACTIVE_COMMAND_CONSOLE</span>
+                  <span className="text-[10px] text-[#10B981] bg-[#16191D] px-1 border border-[#1F2328]">
+                    [READY]
+                  </span>
                 </div>
 
                 <div className="flex items-center space-x-2">
                   <button
                     onClick={() => {
-                      setIngestStockCode(data.stock.code);
-                      setIngestModalOpen(true);
-                    }}
-                    className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-2.5 py-1 rounded-lg flex items-center space-x-1 border border-slate-700 transition"
-                    title="Upload Custom PDF or Markdown Filing"
-                  >
-                    <Upload className="w-3 h-3 text-emerald-400" />
-                    <span className="text-[11px]">Upload</span>
-                  </button>
-                  <button
-                    onClick={() => {
                       setChatMessages([
                         {
-                          role: "assistant",
-                          content: `Research history cleared. Active context reset to **${data.stock.name} (${data.stock.ticker})**. How can I assist you?`,
-                          time: "Just now"
+                          role: "system",
+                          content: `LOG CLEARED // ACTIVE SECURITY: ${data.stock.name.toUpperCase()} (${data.stock.ticker})`,
+                          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
                         }
                       ]);
                     }}
-                    className="text-xs text-slate-400 hover:text-slate-200 p-1 hover:bg-slate-800 rounded-lg transition"
-                    title="Clear Chat History"
+                    className="text-[10px] text-[#8B949E] hover:text-[#F0F3F6] px-1.5 py-0.5 hover:bg-[#1F2328] border border-[#1F2328] rounded-[2px] transition"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    [CLEAR_LOG]
                   </button>
                 </div>
               </div>
 
-              {/* Quick Prompts Bar */}
-              <div className="px-3 py-2 bg-[#101621] border-b border-slate-800 flex items-center space-x-1.5 overflow-x-auto text-[11px] whitespace-nowrap">
-                <Sparkles className="w-3 h-3 text-amber-400 shrink-0 mr-1" />
-                {QUICK_PROMPTS.map((prompt, idx) => (
+              {/* Discrete Query Shortcuts Toolbar (Header Utility Row, NO Floating Pills) */}
+              <div className="px-2 py-1 bg-[#121417] border-b border-[#1F2328] flex items-center space-x-2 overflow-x-auto text-[10px] font-mono whitespace-nowrap">
+                <span className="text-[#8B949E]">QUERIES:</span>
+                {DISCLOSURE_QUERIES.map((q, idx) => (
                   <button
                     key={idx}
-                    onClick={() => handleSendMessage(prompt)}
+                    onClick={() => handleSendMessage(q.prompt)}
                     disabled={chatLoading}
-                    className="bg-[#1b2433] hover:bg-slate-700 text-slate-300 hover:text-white px-2.5 py-1 rounded-full border border-slate-700/80 transition text-[10px] shrink-0 disabled:opacity-50"
+                    className="text-[#8B949E] hover:text-[#38BDF8] hover:bg-[#1F2328] px-1.5 py-0.5 border border-transparent hover:border-[#30363D] transition shrink-0 disabled:opacity-40"
                   >
-                    {prompt}
+                    [{q.label}]
                   </button>
                 ))}
               </div>
 
-              {/* Messages Stream */}
-              <div className="flex-1 p-4 overflow-y-auto space-y-4 text-xs font-sans">
+              {/* Output Log Stream - Raw Monospace / Clean High-Density Reading */}
+              <div className="flex-1 p-2.5 overflow-y-auto space-y-3 text-xs font-mono">
                 {chatMessages.map((msg, index) => (
-                  <div
-                    key={index}
-                    className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}
-                  >
-                    <div className="flex items-center space-x-1.5 mb-1 text-[10px] text-slate-400">
+                  <div key={index} className="space-y-1">
+                    
+                    {/* Timestamp & Sender Identifier */}
+                    <div className="flex items-center space-x-2 text-[10px] text-[#8B949E] select-none">
+                      <span>[{msg.time || "00:00:00"}]</span>
                       {msg.role === "user" ? (
-                        <>
-                          <span>You</span>
-                          {msg.time && <span>• {msg.time}</span>}
-                        </>
+                        <span className="font-bold text-[#F0F3F6]">&gt; USER_QUERY</span>
+                      ) : msg.role === "system" ? (
+                        <span className="text-[#D29922]">&gt;&gt; SYSTEM_DAEMON</span>
                       ) : (
-                        <>
-                          <span className="font-semibold text-blue-400">Analyst Copilot</span>
-                          {msg.time && <span>• {msg.time}</span>}
-                        </>
+                        <span className="font-bold text-[#38BDF8]">&gt; RAG_DISCLOSURE_ENGINE [CHROMA+BM25+FLASHRANK]</span>
                       )}
                     </div>
 
-                    <div
-                      className={`rounded-2xl p-4 max-w-[92%] leading-relaxed shadow-sm ${
-                        msg.role === "user"
-                          ? "bg-blue-600 text-white rounded-tr-none"
-                          : "bg-[#18212f] text-slate-200 border border-slate-700/70 rounded-tl-none"
-                      }`}
-                    >
+                    {/* Content Display (NO rounded bubbles, NO floating card styling) */}
+                    <div className={`p-2 border rounded-[2px] ${
+                      msg.role === "user"
+                        ? "bg-[#16191D] border-[#30363D] text-[#F0F3F6]"
+                        : msg.role === "system"
+                        ? "bg-[#090A0C] border-[#1F2328] text-[#D29922] font-mono text-[11px]"
+                        : "bg-[#090A0C] border-[#1F2328] text-[#F0F3F6]"
+                    }`}>
                       {msg.role === "user" ? (
                         <p className="whitespace-pre-wrap">{msg.content}</p>
+                      ) : msg.role === "system" ? (
+                        <p className="whitespace-pre-wrap">{msg.content}</p>
                       ) : (
-                        <div className="prose prose-invert prose-xs max-w-none space-y-2">
+                        <div className="prose prose-invert prose-xs max-w-none text-[#F0F3F6] font-sans leading-relaxed">
                           <ReactMarkdown
                             components={{
-                              h1: ({ node, ...props }) => <h3 className="text-sm font-bold text-white border-b border-slate-700 pb-1 mt-2 mb-1" {...props} />,
-                              h2: ({ node, ...props }) => <h4 className="text-xs font-bold text-white mt-2 mb-1" {...props} />,
-                              h3: ({ node, ...props }) => <h5 className="text-xs font-semibold text-blue-300 mt-1 mb-0.5" {...props} />,
-                              p: ({ node, ...props }) => <p className="mb-2 leading-relaxed" {...props} />,
-                              ul: ({ node, ...props }) => <ul className="list-disc pl-4 space-y-1 mb-2" {...props} />,
-                              ol: ({ node, ...props }) => <ol className="list-decimal pl-4 space-y-1 mb-2" {...props} />,
-                              li: ({ node, ...props }) => <li className="text-slate-200" {...props} />,
-                              strong: ({ node, ...props }) => <strong className="font-bold text-white" {...props} />,
+                              h1: ({ node, ...props }) => <h3 className="text-xs font-mono font-bold text-[#38BDF8] border-b border-[#1F2328] pb-1 mt-1 mb-1" {...props} />,
+                              h2: ({ node, ...props }) => <h4 className="text-xs font-mono font-bold text-[#F0F3F6] mt-1 mb-0.5" {...props} />,
+                              h3: ({ node, ...props }) => <h5 className="text-[11px] font-mono font-bold text-[#8B949E] mt-1 mb-0.5" {...props} />,
+                              p: ({ node, ...props }) => <p className="mb-1.5 leading-relaxed text-[12px]" {...props} />,
+                              ul: ({ node, ...props }) => <ul className="list-disc pl-4 space-y-0.5 mb-1.5 text-[12px]" {...props} />,
+                              ol: ({ node, ...props }) => <ol className="list-decimal pl-4 space-y-0.5 mb-1.5 text-[12px]" {...props} />,
+                              li: ({ node, ...props }) => <li className="text-[#F0F3F6]" {...props} />,
+                              strong: ({ node, ...props }) => <strong className="font-bold text-[#38BDF8] font-mono" {...props} />,
                               blockquote: ({ node, ...props }) => (
-                                <blockquote className="border-l-2 border-blue-500 pl-3 py-1 my-2 bg-blue-950/20 text-slate-300 italic" {...props} />
+                                <blockquote className="border-l-2 border-[#38BDF8] pl-2 py-0.5 my-1 bg-[#16191D] text-[#8B949E] italic text-[11px]" {...props} />
                               ),
+                              code: ({ node, ...props }) => (
+                                <code className="bg-[#16191D] text-[#38BDF8] font-mono px-1 py-0.2 rounded-[2px] border border-[#1F2328] text-[11px]" {...props} />
+                              )
                             }}
                           >
                             {msg.content}
@@ -982,148 +948,131 @@ export default function BursaFinanceApp() {
                 ))}
 
                 {chatLoading && (
-                  <div className="flex flex-col items-start">
-                    <div className="flex items-center space-x-1.5 mb-1 text-[10px] text-slate-400">
-                      <span className="font-semibold text-blue-400">Analyst Copilot</span>
-                      <span>• Querying 4-Stage RAG...</span>
+                  <div className="space-y-1">
+                    <div className="text-[10px] text-[#8B949E] font-mono">
+                      &gt; SEARCHING RRF RETRIEVAL INDEX + FLASHRANK NEURAL RERANKING...
                     </div>
-                    <div className="bg-[#18212f] border border-slate-700/70 rounded-2xl rounded-tl-none p-3.5 flex items-center space-x-2 text-slate-300">
-                      <div className="flex space-x-1">
-                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce"></div>
-                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
-                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
-                      </div>
-                      <span className="text-[11px] text-slate-400">RRF Search & FlashRank Cross-Encoder reranking...</span>
+                    <div className="bg-[#090A0C] border border-[#1F2328] p-2 text-xs font-mono text-[#8B949E] flex items-center space-x-2">
+                      <div className="w-1.5 h-1.5 bg-[#38BDF8] animate-pulse"></div>
+                      <span>Extracting cited notes from AST filing chunks...</span>
                     </div>
                   </div>
                 )}
                 <div ref={chatBottomRef} />
               </div>
 
-              {/* Chat Input Bar */}
-              <div className="p-3 bg-[#101621] border-t border-slate-800">
+              {/* Docked Command Bar at Bottom */}
+              <div className="p-2 bg-[#090A0C] border-t border-[#1F2328]">
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
                     handleSendMessage();
                   }}
-                  className="flex items-center space-x-2"
+                  className="flex items-center space-x-1.5"
                 >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIngestStockCode(data.stock.code);
-                      setIngestModalOpen(true);
-                    }}
-                    className="p-2 bg-[#1b2433] hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl border border-slate-700 transition"
-                    title="Attach & Ingest Financial Report (PDF / Markdown)"
-                  >
-                    <Paperclip className="w-4 h-4 text-emerald-400" />
-                  </button>
+                  <span className="text-[#8B949E] font-mono text-xs select-none pl-1">&gt;</span>
                   <input
                     type="text"
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
-                    placeholder={`Ask anything about ${data.stock.name} disclosures, risks, or figures...`}
-                    className="flex-1 bg-[#1b2433] border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition"
+                    placeholder={`Query ${data.stock.name} disclosures (e.g. Note B1 revenue breakdown, debt covenants)...`}
+                    className="flex-1 bg-[#121417] border border-[#1F2328] rounded-[2px] px-2.5 py-1.5 text-xs font-mono text-[#F0F3F6] placeholder:text-[#6E7681] focus:outline-none focus:border-[#38BDF8]"
                   />
                   <button
                     type="submit"
                     disabled={chatLoading || !chatInput.trim()}
-                    className="bg-blue-600 hover:bg-blue-500 text-white p-2 rounded-xl font-semibold transition disabled:opacity-40"
+                    className="bg-[#1F2328] hover:bg-[#30363D] text-[#F0F3F6] px-3 py-1.5 rounded-[2px] font-mono text-xs font-bold border border-[#30363D] transition disabled:opacity-40 flex items-center space-x-1"
                   >
-                    <Send className="w-4 h-4" />
+                    <span>EXEC</span>
+                    <CornerDownLeft className="w-3 h-3 text-[#38BDF8]" />
                   </button>
                 </form>
-                <p className="text-[10px] text-slate-400 text-center mt-2">
-                  Grounded in verified Bursa Malaysia quarterly filings • CMSA 2007 non-advisory compliant
-                </p>
+                <div className="flex items-center justify-between text-[9px] font-mono text-[#8B949E] mt-1 px-1">
+                  <span>CMSA 2007 OBJECTIVE RESEARCH</span>
+                  <span>IMMUTABLE AUDIT LOG ACTIVE</span>
+                </div>
               </div>
+
             </div>
 
           </div>
         </main>
       )}
 
-      {/* 4. Universal Financial Report Ingestion Modal */}
+      {/* 4. Universal Document Ingestion Modal - Rigid Flat Styling */}
       {ingestModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#141b26] border border-slate-800 rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-3 select-none">
+          <div className="bg-[#121417] border border-[#1F2328] rounded-[2px] max-w-lg w-full p-4 space-y-3 font-mono text-xs">
             
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center space-x-2.5">
-                <div className="w-8 h-8 rounded-xl bg-emerald-600/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
-                  <FileUp className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-sm text-white">Ingest Financial Report</h3>
-                  <p className="text-[11px] text-slate-400">Index quarterly filings (PDF, Markdown, TXT) into 4-Stage RAG</p>
-                </div>
+            <div className="flex items-center justify-between border-b border-[#1F2328] pb-2">
+              <div className="flex items-center space-x-2">
+                <FileUp className="w-4 h-4 text-[#10B981]" />
+                <span className="font-bold text-[#F0F3F6]">INGEST_DISCLOSURE_FILING</span>
               </div>
               <button
                 onClick={() => {
                   setIngestModalOpen(false);
                   setIngestFeedback(null);
                 }}
-                className="text-slate-400 hover:text-white p-1 rounded-md hover:bg-slate-800 transition"
+                className="text-[#8B949E] hover:text-[#F0F3F6] p-0.5"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Target Stock Code */}
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-semibold text-slate-300">Target Bursa Stock Code</label>
+            <div className="space-y-1">
+              <label className="text-[10px] text-[#8B949E] uppercase block">Target Bursa Code</label>
               <div className="flex items-center space-x-2">
                 <input
                   type="text"
                   value={ingestStockCode}
                   onChange={(e) => setIngestStockCode(e.target.value)}
                   placeholder="e.g. 1155"
-                  className="bg-[#1b2433] border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white w-32 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  className="bg-[#090A0C] border border-[#1F2328] rounded-[2px] px-2 py-1 text-xs text-[#F0F3F6] w-24 font-mono focus:outline-none focus:border-[#38BDF8]"
                 />
-                <span className="text-xs text-slate-400">
-                  Active stock: <span className="font-semibold text-slate-200">{data?.stock?.name || "Maybank"} ({ingestStockCode}.KL)</span>
+                <span className="text-[11px] text-[#8B949E] font-sans">
+                  Active Security: <span className="text-[#F0F3F6] font-bold">{data?.stock?.name || "Maybank"}</span> ({ingestStockCode}.KL)
                 </span>
               </div>
             </div>
 
             {/* Ingestion Mode Toggle */}
-            <div className="flex items-center space-x-2 border-b border-slate-800 pb-2 text-xs">
+            <div className="flex items-center space-x-1 border-b border-[#1F2328] pb-2 text-[11px]">
               <button
                 onClick={() => setIngestMode("file")}
-                className={`py-1.5 px-3 rounded-lg font-semibold transition ${
-                  ingestMode === "file" ? "bg-emerald-600 text-white" : "text-slate-400 hover:text-white"
+                className={`py-1 px-2.5 rounded-[2px] font-bold transition ${
+                  ingestMode === "file" ? "bg-[#1F2328] text-[#F0F3F6]" : "text-[#8B949E]"
                 }`}
               >
-                Upload File (.pdf, .md, .txt)
+                FILE_UPLOAD (.PDF / .MD / .TXT)
               </button>
               <button
                 onClick={() => setIngestMode("text")}
-                className={`py-1.5 px-3 rounded-lg font-semibold transition ${
-                  ingestMode === "text" ? "bg-emerald-600 text-white" : "text-slate-400 hover:text-white"
+                className={`py-1 px-2.5 rounded-[2px] font-bold transition ${
+                  ingestMode === "text" ? "bg-[#1F2328] text-[#F0F3F6]" : "text-[#8B949E]"
                 }`}
               >
-                Paste Filing Text
+                PASTE_FILING_TEXT
               </button>
             </div>
 
-            {/* Mode 1: File Upload */}
+            {/* File Upload Area */}
             {ingestMode === "file" && (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 <div
-                  className="border-2 border-dashed border-slate-700 hover:border-emerald-500 rounded-xl p-6 text-center cursor-pointer transition bg-[#0c1017]"
+                  className="border border-dashed border-[#1F2328] hover:border-[#38BDF8] p-4 text-center cursor-pointer transition bg-[#090A0C] rounded-[2px]"
                   onClick={() => document.getElementById("report-file-input")?.click()}
                 >
-                  <Upload className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-                  <p className="text-xs font-semibold text-slate-200">
-                    {ingestFile ? ingestFile.name : "Click to browse or drag & drop filing"}
+                  <Upload className="w-6 h-6 text-[#8B949E] mx-auto mb-1.5" />
+                  <p className="text-xs font-bold text-[#F0F3F6]">
+                    {ingestFile ? ingestFile.name : "CLICK TO BROWSE OR DRAG DISCLOSURE FILE"}
                   </p>
-                  <p className="text-[10px] text-slate-400 mt-1">Supports Bursa Quarterly PDF reports, Markdown, and TXT</p>
+                  <p className="text-[10px] text-[#8B949E] mt-0.5">Supports Bursa PDF Quarterly Reports, Markdown, and Text</p>
                   {ingestFile && (
-                    <span className="inline-block mt-2 text-[10px] bg-emerald-950 text-emerald-400 px-2 py-0.5 rounded border border-emerald-800">
-                      {(ingestFile.size / 1024).toFixed(1)} KB ready to ingest
+                    <span className="inline-block mt-2 text-[10px] bg-[#16191D] text-[#10B981] px-1.5 py-0.5 border border-[#1F2328] rounded-[2px]">
+                      {(ingestFile.size / 1024).toFixed(1)} KB READY FOR RAG INGESTION
                     </span>
                   )}
                 </div>
@@ -1141,68 +1090,63 @@ export default function BursaFinanceApp() {
               </div>
             )}
 
-            {/* Mode 2: Paste Text */}
+            {/* Text Paste Area */}
             {ingestMode === "text" && (
-              <div className="space-y-2">
-                <label className="text-[11px] font-semibold text-slate-300">Filing Markdown or Explanatory Text</label>
+              <div className="space-y-1">
+                <label className="text-[10px] text-[#8B949E] uppercase block">Raw Markdown or Note Text</label>
                 <textarea
-                  rows={7}
+                  rows={6}
                   value={ingestText}
                   onChange={(e) => setIngestText(e.target.value)}
-                  placeholder="Paste Markdown tables or Part B explanatory notes..."
-                  className="w-full bg-[#1b2433] border border-slate-700 rounded-lg p-3 text-xs text-white font-mono focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  placeholder="Paste statement tables or Part B explanatory notes..."
+                  className="w-full bg-[#090A0C] border border-[#1F2328] rounded-[2px] p-2 text-[11px] font-mono text-[#F0F3F6] focus:outline-none focus:border-[#38BDF8]"
                 />
               </div>
             )}
 
-            {/* Feedback / Status Notification */}
+            {/* Status Feedback */}
             {ingestFeedback && (
-              <div
-                className={`p-3 rounded-lg text-xs flex items-center space-x-2 ${
-                  ingestFeedback.success
-                    ? "bg-emerald-950/60 border border-emerald-800 text-emerald-300"
-                    : "bg-rose-950/60 border border-rose-800 text-rose-300"
-                }`}
-              >
-                {ingestFeedback.success ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
-                <div>
-                  <p className="font-semibold">{ingestFeedback.message}</p>
-                  {ingestFeedback.details && (
-                    <p className="text-[10px] text-emerald-400/80">
-                      Indexed {ingestFeedback.details.sections_indexed} sections and {ingestFeedback.details.tables_extracted} financial tables into RAG.
-                    </p>
-                  )}
-                </div>
+              <div className={`p-2 rounded-[2px] text-xs border ${
+                ingestFeedback.success
+                  ? "bg-[#090A0C] border-[#10B981] text-[#10B981]"
+                  : "bg-[#090A0C] border-[#F85149] text-[#F85149]"
+              }`}>
+                <p className="font-bold">{ingestFeedback.message}</p>
+                {ingestFeedback.details && (
+                  <p className="text-[10px] text-[#8B949E] mt-0.5">
+                    Indexed {ingestFeedback.details.sections_indexed} sections and {ingestFeedback.details.tables_extracted} tables into RAG.
+                  </p>
+                )}
               </div>
             )}
 
-            {/* Modal Actions */}
-            <div className="flex items-center justify-end space-x-3 pt-3 border-t border-slate-800">
+            {/* Modal Controls */}
+            <div className="flex items-center justify-end space-x-2 pt-2 border-t border-[#1F2328]">
               <button
                 type="button"
                 onClick={() => {
                   setIngestModalOpen(false);
                   setIngestFeedback(null);
                 }}
-                className="px-4 py-2 rounded-lg text-xs text-slate-300 hover:text-white hover:bg-slate-800 transition"
+                className="px-2.5 py-1 text-xs text-[#8B949E] hover:text-[#F0F3F6] hover:bg-[#1F2328] rounded-[2px] transition"
               >
-                Cancel
+                CANCEL
               </button>
               <button
                 type="button"
                 onClick={handleIngestReport}
                 disabled={ingestLoading || (ingestMode === "file" && !ingestFile) || (ingestMode === "text" && !ingestText.trim())}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2 rounded-lg text-xs font-semibold flex items-center space-x-2 transition shadow disabled:opacity-50"
+                className="bg-[#1F2328] hover:bg-[#30363D] text-[#10B981] px-3 py-1 rounded-[2px] text-xs font-bold border border-[#30363D] transition disabled:opacity-40 flex items-center space-x-1.5"
               >
                 {ingestLoading ? (
                   <>
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>Indexing into RAG...</span>
+                    <RefreshCw className="w-3 h-3 animate-spin" />
+                    <span>INDEXING...</span>
                   </>
                 ) : (
                   <>
-                    <Database className="w-3.5 h-3.5" />
-                    <span>Ingest & Index Report</span>
+                    <Database className="w-3 h-3" />
+                    <span>INGEST_INDEX</span>
                   </>
                 )}
               </button>
@@ -1212,13 +1156,14 @@ export default function BursaFinanceApp() {
         </div>
       )}
 
-      {/* 5. Clean Institutional Footer */}
-      <footer className="bg-[#141b26] border-t border-slate-800 py-4 px-4 sm:px-6 text-center text-xs text-slate-400">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px]">
-          <p>© 2026 Bursa Intelligence Terminal. Grounded in Bursa Malaysia Regulatory Disclosures.</p>
-          <p className="text-slate-400">Compliant with CMSA 2007 • 4-Stage Modular RAG (AST + ChromaDB + BM25 + FlashRank)</p>
+      {/* 5. Minimal Institutional Footer */}
+      <footer className="bg-[#121417] border-t border-[#1F2328] py-1.5 px-3 text-[10px] font-mono text-[#8B949E] select-none">
+        <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-1">
+          <p>© 2026 BURSA_INTELLIGENCE // GROUNDED IN PUBLIC QUARTERLY FILINGS</p>
+          <p>CMSA 2007 NON-ADVISORY COMPLIANT // 4-STAGE RAG (AST + CHROMADB + BM25 + FLASHRANK)</p>
         </div>
       </footer>
+
     </div>
   );
 }

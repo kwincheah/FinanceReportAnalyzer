@@ -4,44 +4,57 @@
 
 :root {
   color-scheme: dark;
-  --color-scrollbar-track: #0b0f19;
-  --color-scrollbar-thumb: #1e293b;
-  scrollbar-color: var(--color-scrollbar-thumb) var(--color-scrollbar-track);
+  --color-canvas: #090A0C;
+  --color-surface: #121417;
+  --color-border: #1F2328;
+  --color-text: #F0F3F6;
+  --color-muted: #8B949E;
+  --color-zebra: #16191D;
 }
 
 body {
-  background-color: #0b0f19;
-  color: #e2e8f0;
-  accent-color: #2563eb;
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  background-color: #090A0C;
+  color: #F0F3F6;
+  accent-color: #38BDF8;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11", "tnum";
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  letter-spacing: -0.01em;
 }
 
-/* Tabular figures for financial numbers */
+/* Strict Tabular Numbers for all financial metrics */
 .tabular-nums {
   font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }
 
-/* Institutional custom scrollbars */
+/* Rigid Flat Scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #0b0f19;
+  background: #090A0C;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1e293b;
-  border-radius: 3px;
+  background: #1F2328;
+  border-radius: 0px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #334155;
+  background: #30363D;
 }
 
-/* Clean subtle transitions */
-.transition-card {
-  transition: border-color 0.15s ease, background-color 0.15s ease;
+/* Institutional Zebra Striping */
+.table-zebra tbody tr:nth-child(even) {
+  background-color: #16191D;
+}
+
+.table-zebra tbody tr:nth-child(odd) {
+  background-color: #121417;
+}
+
+.table-zebra tbody tr:hover {
+  background-color: #1A1F26;
 }
