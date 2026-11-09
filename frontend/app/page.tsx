@@ -23,7 +23,11 @@ import {
   Calculator,
   RefreshCw,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Sparkles,
+  Bot,
+  ArrowRight,
+  Check
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import {
@@ -102,6 +106,73 @@ const DISCLOSURE_QUERIES = [
   { label: "DCF & Valuation Rationale", prompt: "What are the key valuation sensitivities, cost of capital, and terminal growth assumptions for this stock?" }
 ];
 
+// Smart Natural Language & Ticker Parser
+function parseNaturalQuery(query: string) {
+  if (!query.trim()) return { company: null, instruction: "", raw: "" };
+
+  const qLower = query.toLowerCase().trim();
+  let matchedCompany: typeof POPULAR_COMPANIES[0] | null = null;
+
+  for (const comp of POPULAR_COMPANIES) {
+    const triggers = [
+      comp.code,
+      comp.ticker.toLowerCase(),
+      comp.name.toLowerCase(),
+      ...comp.name.toLowerCase().split(" "),
+    ].filter(t => t.length > 2);
+
+    if (comp.name.toLowerCase().includes("tenaga")) triggers.push("tnb", "tenaga");
+    if (comp.name.toLowerCase().includes("maybank")) triggers.push("malayan banking", "maybank");
+    if (comp.name.toLowerCase().includes("cimb")) triggers.push("cimb");
+    if (comp.name.toLowerCase().includes("d.i.y")) triggers.push("diy", "mr diy", "mr. diy", "mrdiy");
+    if (comp.name.toLowerCase().includes("public bank")) triggers.push("pbb", "public bank", "public");
+    if (comp.name.toLowerCase().includes("top glove")) triggers.push("top glove", "topglove", "glove");
+    if (comp.name.toLowerCase().includes("petronas chem")) triggers.push("petchem", "petronas", "pcg");
+    if (comp.name.toLowerCase().includes("ytl power")) triggers.push("ytl", "ytl power", "ytlpower");
+
+    for (const trig of triggers) {
+      const reg = new RegExp(`\\b${trig.replace('.', '\\.')}\\b`, 'i');
+      if (reg.test(qLower)) {
+        matchedCompany = comp;
+        break;
+      }
+    }
+    if (matchedCompany) break;
+  }
+
+  // Fallback to substring match
+  if (!matchedCompany) {
+    matchedCompany = POPULAR_COMPANIES.find(c =>
+      qLower.includes(c.code) ||
+      qLower.includes(c.name.toLowerCase()) ||
+      qLower.includes(c.ticker.toLowerCase())
+    ) || null;
+  }
+
+  // Extract remaining instruction
+  let instruction = query;
+  if (matchedCompany) {
+    let clean = query;
+    clean = clean.replace(new RegExp(matchedCompany.name, 'gi'), '');
+    clean = clean.replace(new RegExp(matchedCompany.ticker, 'gi'), '');
+    clean = clean.replace(new RegExp(`\\b${matchedCompany.code}\\b`, 'gi'), '');
+    clean = clean.replace(/\b(for|of|on|about|the|stock|company|bursa|please|can you|analyze|analyse)\b/gi, ' ');
+    clean = clean.replace(/\s+/g, ' ').trim();
+    instruction = clean;
+  }
+
+  // If user explicitly said "analyze/analyse the financial report", preserve the analytical request
+  if (/analy[sz]e/i.test(query) && /financial|report|filing|quarterly/i.test(query)) {
+    instruction = "Please perform a comprehensive forensic analysis of the latest financial report, highlighting topline revenue, PATAMI margins, and Part B notes.";
+  }
+
+  return {
+    company: matchedCompany,
+    instruction: instruction,
+    raw: query
+  };
+}
+
 export default function TerminalPage() {
   const [view, setView] = useState<"home" | "terminal">("home");
   const [activeCode, setActiveCode] = useState<string>("1155");
@@ -109,6 +180,11 @@ export default function TerminalPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Start Page Interactive Assistant Popup State
+  const [isInputActive, setIsInputActive] = useState(false);
+  const [parsedIntent, setParsedIntent] = useState<ReturnType<typeof parseNaturalQuery>>({ company: null, instruction: "", raw: "" });
+  const [assistantDismissed, setAssistantDismissed] = useState(false);
 
   const [selectedInterval, setSelectedInterval] = useState<string>("1D");
   const [chartData, setChartData] = useState(CHART_INTERVALS["1D"]);
@@ -130,9 +206,22 @@ export default function TerminalPage() {
   const [ingestLoading, setIngestLoading] = useState(false);
   const [ingestFeedback, setIngestFeedback] = useState<{ success: boolean; message: string; details?: any } | null>(null);
 
-  const loadStockData = async (code: string) => {
+  // Update real-time intent parsing as user types
+  useEffect(() => {
+    if (searchQuery.trim().length > 0) {
+      const intent = parseNaturalQuery(searchQuery);
+      setParsedIntent(intent);
+      setAssistantDismissed(false);
+    } else {
+      setParsedIntent({ company: null, instruction: "", raw: "" });
+    }
+  }, [searchQuery]);
+
+  const loadStockData = async (code: string, autoInstruction?: string) => {
     setLoading(true);
     setError(null);
+    setIsInputActive(false);
+
     try {
       const res = await fetch(`${API_BASE}/api/reports/analyze`, {
         method: "POST",
@@ -165,10 +254,17 @@ export default function TerminalPage() {
         },
         {
           role: "assistant",
-          content: `Quarterly regulatory filing retrieved and indexed for **${json.stock.name} (${json.stock.ticker})**.\n\n- **Current Price:** RM ${json.stock.price.toFixed(2)} (${json.stock.change_pct >= 0 ? "+" : ""}${json.stock.change_pct.toFixed(2)}%)\n- **Operating Revenue:** RM ${(json.financial_statement?.revenue || 7200000).toLocaleString()} ('000)\n- **PATAMI:** RM ${(json.financial_statement?.net_profit || 2350000).toLocaleString()} ('000)\n- **Indexed Disclosures:** Condensed P&L, Balance Sheet, and Part B Notes B1 through B6.\n\nEnter queries below or select query shortcuts to inspect disclosures.`,
+          content: `Quarterly regulatory filing retrieved and indexed for **${json.stock.name} (${json.stock.ticker})**.\n\n- **Current Price:** RM ${json.stock.price.toFixed(2)} (${json.stock.change_pct >= 0 ? "+" : ""}${json.stock.change_pct.toFixed(2)}%)\n- **Operating Revenue:** RM ${(json.financial_statement?.revenue || 7200000).toLocaleString()} ('000)\n- **PATAMI:** RM ${(json.financial_statement?.net_profit || 2350000).toLocaleString()} ('000)\n- **Indexed Disclosures:** Condensed P&L, Balance Sheet, and Part B Notes B1 through B6.`,
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
         }
       ]);
+
+      // If user had included an instruction in their initial search, execute it immediately in the console!
+      if (autoInstruction && autoInstruction.trim().length > 0) {
+        setTimeout(() => {
+          handleSendMessage(autoInstruction.trim(), code);
+        }, 500);
+      }
 
     } catch (err: any) {
       setError(err.message || "Failed to load stock data");
@@ -196,27 +292,20 @@ export default function TerminalPage() {
     e.preventDefault();
     if (!searchQuery.trim()) return;
 
-    let targetCode = searchQuery.trim();
-    const queryLower = searchQuery.toLowerCase().trim();
+    const parsed = parseNaturalQuery(searchQuery);
+    const targetCode = parsed.company ? parsed.company.code : (POPULAR_COMPANIES.find(c => c.code === searchQuery.trim())?.code || "1155");
+    const instruction = parsed.instruction || "";
 
-    const matched = POPULAR_COMPANIES.find(
-      c => c.name.toLowerCase().includes(queryLower) || 
-           c.code === queryLower || 
-           c.ticker.toLowerCase().includes(queryLower)
-    );
-
-    if (matched) {
-      targetCode = matched.code;
-    }
-
-    loadStockData(targetCode);
+    loadStockData(targetCode, instruction);
     setSearchQuery("");
+    setIsInputActive(false);
   };
 
-  const handleSendMessage = async (textToSend?: string) => {
+  const handleSendMessage = async (textToSend?: string, overrideCode?: string) => {
     const query = textToSend || chatInput;
     if (!query.trim() || chatLoading) return;
 
+    const stockToUse = overrideCode || activeCode;
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
     const userMsg = { role: "user" as const, content: query, time: timeStr };
     setChatMessages((prev) => [...prev, userMsg]);
@@ -229,7 +318,7 @@ export default function TerminalPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: query,
-          stock_code: activeCode,
+          stock_code: stockToUse,
         }),
       });
 
@@ -318,26 +407,26 @@ export default function TerminalPage() {
   const isPositive = (data?.stock?.change_pct || 0) >= 0;
 
   return (
-    <div className="min-h-screen bg-[#090A0C] text-[#F0F3F6] flex flex-col font-sans antialiased">
+    <div className="min-h-screen bg-[#090A0C] text-[#F0F3F6] flex flex-col font-sans antialiased selection:bg-[#38BDF8] selection:text-[#090A0C]">
       
-      {/* 1. Global Terminal Header - Rigid 1px Border Grid */}
+      {/* 1. Global Terminal Header - Fits All Screen Sizes */}
       <header className="bg-[#121417] border-b border-[#1F2328] sticky top-0 z-40 select-none">
-        <div className="w-full px-3 py-1.5 flex items-center justify-between gap-3 text-xs">
+        <div className="w-full max-w-7xl mx-auto px-3 sm:px-4 py-2 flex items-center justify-between gap-3 text-xs">
           
           {/* Logo & Terminal Identity */}
-          <div className="flex items-center space-x-2.5 cursor-pointer" onClick={() => setView("home")}>
+          <div className="flex items-center space-x-2.5 cursor-pointer shrink-0" onClick={() => setView("home")}>
             <div className="w-5 h-5 bg-[#1F2328] border border-[#30363D] flex items-center justify-center font-mono font-bold text-[#F0F3F6] text-[11px] rounded-[2px]">
               B
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-1.5">
               <span className="font-mono font-bold tracking-wider text-[12px] text-[#F0F3F6]">BURSA_INTELLIGENCE</span>
-              <span className="text-[10px] font-mono bg-[#16191D] text-[#8B949E] px-1 py-0.2 border border-[#1F2328] rounded-[2px]">
-                TERMINAL v2.4
+              <span className="text-[10px] font-mono bg-[#16191D] text-[#8B949E] px-1 py-0.2 border border-[#1F2328] rounded-[2px] hidden sm:inline">
+                KLSE
               </span>
             </div>
           </div>
 
-          {/* Quick Command Search Bar */}
+          {/* Quick Command Search Bar (Terminal View) */}
           {view === "terminal" && (
             <form onSubmit={handleSearchSubmit} className="flex-1 max-w-sm hidden md:flex items-center">
               <div className="relative w-full">
@@ -346,29 +435,30 @@ export default function TerminalPage() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="CMD: SWITCH SYMBOL (e.g. 5347, TENAGA, CIMB, 1155)..."
-                  className="w-full bg-[#090A0C] border border-[#1F2328] rounded-[2px] pl-6 pr-12 py-1 text-[11px] font-mono text-[#F0F3F6] placeholder:text-[#6E7681] focus:outline-none focus:border-[#38BDF8]"
+                  placeholder="Switch stock (e.g. 5347, Tenaga, CIMB, MR DIY)..."
+                  className="w-full bg-[#090A0C] border border-[#1F2328] rounded-[2px] pl-6 pr-14 py-1 text-[11px] font-mono text-[#F0F3F6] placeholder:text-[#6E7681] focus:outline-none focus:border-[#38BDF8]"
                 />
                 <button
                   type="submit"
                   disabled={loading}
                   className="absolute right-1 top-1/2 -translate-y-1/2 bg-[#16191D] hover:bg-[#1F2328] text-[#8B949E] hover:text-[#F0F3F6] px-1.5 py-0.5 rounded-[2px] text-[10px] font-mono border border-[#1F2328] disabled:opacity-40"
                 >
-                  {loading ? "FETCH" : "EXEC"}
+                  {loading ? "FETCH" : "GO"}
                 </button>
               </div>
             </form>
           )}
 
-          {/* System Control Utility Actions */}
+          {/* Navigation & Ingestion Controls */}
           <div className="flex items-center space-x-1.5 font-mono text-[11px]">
             {view === "terminal" && (
               <button
                 onClick={() => setView("home")}
                 className="bg-[#121417] hover:bg-[#16191D] text-[#8B949E] hover:text-[#F0F3F6] px-2 py-1 rounded-[2px] border border-[#1F2328] flex items-center space-x-1"
+                title="Return to Start Page"
               >
                 <ArrowLeft className="w-3 h-3" />
-                <span className="hidden sm:inline">ROOT_INDEX</span>
+                <span className="hidden sm:inline">START_PAGE</span>
               </button>
             )}
 
@@ -377,79 +467,88 @@ export default function TerminalPage() {
                 setIngestStockCode(data?.stock?.code || "1155");
                 setIngestModalOpen(true);
               }}
-              className="bg-[#121417] hover:bg-[#16191D] text-[#10B981] px-2.5 py-1 rounded-[2px] border border-[#1F2328] flex items-center space-x-1.5 font-semibold"
+              className="bg-[#121417] hover:bg-[#16191D] text-[#10B981] px-2.5 py-1 rounded-[2px] border border-[#1F2328] flex items-center space-x-1 font-semibold"
+              title="Upload PDF or Markdown Filing"
             >
               <FileUp className="w-3 h-3" />
-              <span>[INGEST_FILING]</span>
+              <span className="hidden sm:inline">[INGEST_FILING]</span>
+              <span className="sm:hidden">INGEST</span>
             </button>
-
-            <span className="text-[#8B949E] hidden lg:inline px-1">|</span>
-            <span className="text-[10px] text-[#8B949E] hidden lg:inline tabular-nums">
-              CMSA 2007 VERIFIED
-            </span>
           </div>
         </div>
       </header>
 
-      {/* 2. VIEW 1: FLAT INSTITUTIONAL START PAGE */}
+      {/* 2. VIEW 1: USER-FRIENDLY RESPONSIVE START PAGE */}
       {view === "home" && (
-        <main className="flex-1 w-full max-w-6xl mx-auto px-3 sm:px-6 py-6 flex flex-col items-center justify-center space-y-6">
+        <main className="flex-1 w-full max-w-5xl mx-auto px-3 sm:px-6 py-6 sm:py-10 flex flex-col items-center justify-center space-y-6 sm:space-y-8">
           
-          {/* Hero Section - Flat & High Density */}
-          <div className="text-center space-y-2 max-w-2xl w-full">
+          {/* Header Title */}
+          <div className="text-center space-y-2 max-w-xl w-full">
             <div className="inline-flex items-center space-x-1.5 bg-[#121417] border border-[#1F2328] px-2 py-0.5 text-[11px] font-mono text-[#8B949E] rounded-[2px]">
               <ShieldCheck className="w-3.5 h-3.5 text-[#38BDF8]" />
-              <span>BURSA MALAYSIA FORENSIC INTELLIGENCE ENGINE</span>
+              <span>BURSA MALAYSIA FORENSIC TERMINAL</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-mono font-bold text-[#F0F3F6] tracking-tight">
-              INSTITUTIONAL REGULATORY TERMINAL
+              FINANCIAL INTELLIGENCE
             </h1>
-            <p className="text-[#8B949E] text-xs leading-relaxed font-sans">
-              Automated on-demand ingestion of quarterly disclosures, condensed financial statements, and Part B explanatory notes through a 4-Stage Modular RAG pipeline.
+            <p className="text-[#8B949E] text-xs sm:text-sm leading-relaxed">
+              Enter any company or question. The terminal automatically pulls the financial report, extracts statement tables, and indexes regulatory notes into a 4-Stage RAG copilot.
             </p>
           </div>
 
-          {/* Centered Command Query Box */}
-          <div className="w-full max-w-2xl">
+          {/* Interactive Hero Search Input Bar */}
+          <div className="w-full max-w-2xl relative">
             <form onSubmit={handleSearchSubmit} className="relative">
               <div className="relative flex items-center">
-                <span className="absolute left-3 text-[#8B949E] font-mono text-xs select-none">&gt;</span>
+                <span className="absolute left-3.5 text-[#8B949E] font-mono text-sm select-none">&gt;</span>
                 <input
                   type="text"
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="QUERY COMPANY OR TICKER (e.g. 5347, TENAGA, MAYBANK, MR DIY, CIMB)..."
-                  className="w-full bg-[#121417] border border-[#1F2328] rounded-[2px] pl-7 pr-28 py-2.5 text-xs font-mono text-[#F0F3F6] placeholder:text-[#6E7681] focus:outline-none focus:border-[#38BDF8]"
+                  onFocus={() => {
+                    setIsInputActive(true);
+                    setAssistantDismissed(false);
+                  }}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setIsInputActive(true);
+                  }}
+                  placeholder="e.g. Tenaga, Maybank, or 'analyse financial report for Tenaga'..."
+                  className="w-full bg-[#121417] border border-[#1F2328] hover:border-[#30363D] focus:border-[#38BDF8] rounded-[3px] pl-8 pr-28 py-3 text-xs sm:text-sm font-mono text-[#F0F3F6] placeholder:text-[#6E7681] focus:outline-none transition"
                   autoFocus
                 />
                 <button
                   type="submit"
                   disabled={loading || !searchQuery.trim()}
-                  className="absolute right-1.5 bg-[#1F2328] hover:bg-[#30363D] text-[#F0F3F6] px-3 py-1.5 rounded-[2px] text-[11px] font-mono font-semibold border border-[#30363D] disabled:opacity-40 flex items-center space-x-1"
+                  className="absolute right-1.5 bg-[#1F2328] hover:bg-[#30363D] text-[#F0F3F6] px-3 py-2 rounded-[2px] text-xs font-mono font-semibold border border-[#30363D] disabled:opacity-40 flex items-center space-x-1 transition"
                 >
                   {loading ? (
                     <>
                       <RefreshCw className="w-3 h-3 animate-spin text-[#38BDF8]" />
-                      <span>INGESTING...</span>
+                      <span className="hidden sm:inline">INGESTING...</span>
                     </>
                   ) : (
                     <>
-                      <span>LOAD_SECURITY</span>
+                      <span>SEARCH</span>
                       <CornerDownLeft className="w-3 h-3 text-[#38BDF8]" />
                     </>
                   )}
                 </button>
               </div>
             </form>
+
+            {/* Quick helper tip below search input */}
+            <p className="text-[10px] text-[#8B949E] font-mono mt-1.5 text-center">
+              TIP: Type commands like <span className="text-[#38BDF8]">&quot;analyse financial report for 5347&quot;</span> or click any equity below
+            </p>
           </div>
 
-          {/* Popular Equities Grid - Rigid 1px Border Tiling */}
-          <div className="w-full max-w-4xl space-y-2">
+          {/* Popular Equities Grid - Responsive & Touch-Friendly */}
+          <div className="w-full space-y-2">
             <div className="flex items-center justify-between border-b border-[#1F2328] pb-1">
               <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#8B949E]">
-                CORE EQUITIES // DIRECT INGESTION INDEX
+                QUICK ACCESS EQUITIES // SELECT TO ANALYZE
               </span>
-              <span className="text-[10px] font-mono text-[#8B949E]">KLSE EQUITIES</span>
+              <span className="text-[10px] font-mono text-[#8B949E]">BURSA MAIN MARKET</span>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-[#1F2328] border border-[#1F2328] rounded-[2px]">
@@ -458,7 +557,7 @@ export default function TerminalPage() {
                   key={company.code}
                   onClick={() => loadStockData(company.code)}
                   disabled={loading}
-                  className="bg-[#121417] hover:bg-[#16191D] p-2.5 text-left transition flex flex-col justify-between group"
+                  className="bg-[#121417] hover:bg-[#16191D] p-2.5 text-left transition flex flex-col justify-between group active:scale-[0.99]"
                 >
                   <div className="flex items-center justify-between w-full mb-1">
                     <span className="font-mono text-xs font-bold text-[#F0F3F6] group-hover:text-[#38BDF8]">
@@ -481,8 +580,8 @@ export default function TerminalPage() {
             </div>
           </div>
 
-          {/* Macroeconomic Indicators - Continuous Flat Grid */}
-          <div className="w-full max-w-4xl space-y-2">
+          {/* Macroeconomic Indicators Grid */}
+          <div className="w-full space-y-2">
             <div className="flex items-center justify-between border-b border-[#1F2328] pb-1">
               <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#8B949E]">
                 MACROECONOMIC BENCHMARKS
@@ -509,52 +608,205 @@ export default function TerminalPage() {
               <div className="bg-[#121417] p-2.5">
                 <span className="text-[10px] font-mono text-[#8B949E] block">BNM POLICY RATE (OPR)</span>
                 <span className="text-sm font-mono font-bold text-[#F0F3F6] tabular-nums">3.00%</span>
-                <span className="text-[10px] font-mono text-[#8B949E] block">ACCOMMODATIVE</span>
+                <span className="text-[10px] font-mono text-[#8B949E] block">NEUTRAL</span>
               </div>
             </div>
           </div>
 
-          {/* 4-Stage RAG Pipeline Architecture Grid */}
-          <div className="w-full max-w-4xl space-y-2">
+          {/* 4-Stage RAG Pipeline Information */}
+          <div className="w-full space-y-2">
             <div className="flex items-center justify-between border-b border-[#1F2328] pb-1">
               <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#8B949E]">
                 SYSTEM PIPELINE // 4-STAGE RETRIEVAL ARCHITECTURE
               </span>
-              <span className="text-[10px] font-mono text-[#8B949E]">DETERMINISTIC VERIFICATION</span>
+              <span className="text-[10px] font-mono text-[#8B949E]">CMSA 2007 VERIFIED</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-px bg-[#1F2328] border border-[#1F2328] rounded-[2px] text-xs">
               <div className="bg-[#121417] p-2.5">
                 <span className="text-[#38BDF8] font-mono text-[10px] font-bold block mb-0.5">STAGE 1: AST CHUNKING</span>
-                <p className="text-[#8B949E] text-[11px] leading-snug">Preserves atomic financial tables and parent-child hierarchy for Part B notes.</p>
+                <p className="text-[#8B949E] text-[11px] leading-snug">Extracts tables and keeps Part B notes in parent-child hierarchy.</p>
               </div>
               <div className="bg-[#121417] p-2.5">
                 <span className="text-[#38BDF8] font-mono text-[10px] font-bold block mb-0.5">STAGE 2: HYBRID RRF</span>
-                <p className="text-[#8B949E] text-[11px] leading-snug">Reciprocal Rank Fusion uniting dense ChromaDB vectors with sparse BM25 Okapi keywords.</p>
+                <p className="text-[#8B949E] text-[11px] leading-snug">Unites dense ChromaDB vectors with sparse BM25 Okapi keywords.</p>
               </div>
               <div className="bg-[#121417] p-2.5">
                 <span className="text-[#38BDF8] font-mono text-[10px] font-bold block mb-0.5">STAGE 3: FLASHRANK</span>
-                <p className="text-[#8B949E] text-[11px] leading-snug">Cross-Encoder neural reranker scoring top regulatory passages in ~15ms on CPU.</p>
+                <p className="text-[#8B949E] text-[11px] leading-snug">Neural cross-encoder reranks top regulatory passages in ~15ms on CPU.</p>
               </div>
               <div className="bg-[#121417] p-2.5">
                 <span className="text-[#10B981] font-mono text-[10px] font-bold block mb-0.5">STAGE 4: CITED SYNTHESIS</span>
-                <p className="text-[#8B949E] text-[11px] leading-snug">Objective, grounded notes citing regulatory disclosures under CMSA 2007 guidelines.</p>
+                <p className="text-[#8B949E] text-[11px] leading-snug">Cites specific explanatory notes ([Note B1], [Note B3]) with zero hallucination.</p>
               </div>
             </div>
           </div>
+
+          {/* ========================================================================= */}
+          {/* USER-REQUESTED INTERACTIVE COPILOT POPUP AT BOTTOM OF START PAGE          */}
+          {/* Confirms company intended + captures user instruction + offers suggestions */}
+          {/* ========================================================================= */}
+          {(isInputActive || searchQuery.trim().length > 0) && !assistantDismissed && (
+            <div className="fixed bottom-3 sm:bottom-5 left-1/2 -translate-x-1/2 w-[94%] max-w-lg z-50 bg-[#121417] border border-[#30363D] shadow-2xl rounded-[3px] p-3 text-xs font-mono animate-in fade-in slide-in-from-bottom-2 duration-150">
+              
+              {/* Popup Header */}
+              <div className="flex items-center justify-between border-b border-[#1F2328] pb-1.5 mb-2">
+                <div className="flex items-center space-x-1.5">
+                  <Bot className="w-3.5 h-3.5 text-[#38BDF8]" />
+                  <span className="font-bold text-[#F0F3F6] text-[11px]">QUERY ASSISTANT // CONFIRMATION</span>
+                </div>
+                <button
+                  onClick={() => setAssistantDismissed(true)}
+                  className="text-[#8B949E] hover:text-[#F0F3F6] p-0.5"
+                  title="Close Assistant"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* Case 1: Company Matched */}
+              {parsedIntent.company ? (
+                <div className="space-y-2">
+                  <div className="bg-[#090A0C] border border-[#1F2328] p-2 rounded-[2px]">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-[#8B949E]">DETECTED SECURITY:</span>
+                      <span className="font-bold text-[#10B981] flex items-center space-x-1">
+                        <Check className="w-3 h-3" />
+                        <span>MATCHED</span>
+                      </span>
+                    </div>
+                    <div className="flex items-baseline justify-between mt-1">
+                      <span className="text-[#F0F3F6] font-bold text-sm">
+                        {parsedIntent.company.name} ({parsedIntent.company.ticker})
+                      </span>
+                      <span className="text-[#38BDF8] font-bold tabular-nums">
+                        RM {parsedIntent.company.price.toFixed(2)}
+                      </span>
+                    </div>
+
+                    {/* Instruction preview if user typed additional commands */}
+                    {parsedIntent.instruction ? (
+                      <div className="mt-2 pt-1.5 border-t border-[#1F2328] text-[11px]">
+                        <span className="text-[#8B949E] block mb-0.5">INSTRUCTION TO EXECUTE IN CHATBOT:</span>
+                        <div className="text-[#38BDF8] bg-[#16191D] p-1.5 border border-[#1F2328] rounded-[2px] font-sans italic">
+                          &quot;{parsedIntent.instruction}&quot;
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  {/* Primary Action Button */}
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => {
+                        const comp = parsedIntent.company!;
+                        loadStockData(comp.code, parsedIntent.instruction);
+                        setAssistantDismissed(true);
+                      }}
+                      disabled={loading}
+                      className="flex-1 bg-[#10B981] hover:bg-[#059669] text-[#090A0C] font-bold py-2 px-3 rounded-[2px] flex items-center justify-center space-x-1.5 transition"
+                    >
+                      {loading ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          <span>PULLING FILING...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>
+                            {parsedIntent.instruction ? "CONFIRM & RUN INSTRUCTION" : `ANALYZE ${parsedIntent.company.name.toUpperCase()}`}
+                          </span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Quick Preset Query Suggestions */}
+                  <div className="pt-1 border-t border-[#1F2328]">
+                    <span className="text-[10px] text-[#8B949E] block mb-1">OR RUN SUGGESTED PROMPT:</span>
+                    <div className="flex flex-wrap gap-1">
+                      <button
+                        onClick={() => {
+                          const comp = parsedIntent.company!;
+                          loadStockData(comp.code, "Perform a comprehensive analysis of the financial report and Note B1 revenue drivers.");
+                          setAssistantDismissed(true);
+                        }}
+                        className="bg-[#16191D] hover:bg-[#1F2328] text-[#8B949E] hover:text-[#F0F3F6] text-[10px] px-1.5 py-0.5 rounded-[2px] border border-[#1F2328] transition"
+                      >
+                        + Note B1 Revenue Breakdown
+                      </button>
+                      <button
+                        onClick={() => {
+                          const comp = parsedIntent.company!;
+                          loadStockData(comp.code, "Analyze Note B3 prospects, capital expenditure plans, and operational risks.");
+                          setAssistantDismissed(true);
+                        }}
+                        className="bg-[#16191D] hover:bg-[#1F2328] text-[#8B949E] hover:text-[#F0F3F6] text-[10px] px-1.5 py-0.5 rounded-[2px] border border-[#1F2328] transition"
+                      >
+                        + Note B3 Board Prospects
+                      </button>
+                      <button
+                        onClick={() => {
+                          const comp = parsedIntent.company!;
+                          loadStockData(comp.code, "Summarize total borrowings, gearing ratio, and debt covenants.");
+                          setAssistantDismissed(true);
+                        }}
+                        className="bg-[#16191D] hover:bg-[#1F2328] text-[#8B949E] hover:text-[#F0F3F6] text-[10px] px-1.5 py-0.5 rounded-[2px] border border-[#1F2328] transition"
+                      >
+                        + Debt & Covenants
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* Case 2: No Exact Company Matched Yet - Provide Quick Selector */
+                <div className="space-y-2">
+                  <p className="text-[#8B949E] text-[11px]">
+                    Which Bursa company would you like to analyze? Click one to confirm:
+                  </p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {POPULAR_COMPANIES.slice(0, 4).map((c) => (
+                      <button
+                        key={c.code}
+                        onClick={() => {
+                          const instruction = searchQuery.trim();
+                          loadStockData(c.code, instruction);
+                          setAssistantDismissed(true);
+                        }}
+                        className="bg-[#090A0C] hover:bg-[#16191D] text-left p-1.5 border border-[#1F2328] hover:border-[#38BDF8] rounded-[2px] transition flex items-center justify-between"
+                      >
+                        <div>
+                          <span className="font-bold text-[#F0F3F6] block text-[11px]">{c.name}</span>
+                          <span className="text-[10px] text-[#8B949E]">{c.ticker}</span>
+                        </div>
+                        <span className="text-[10px] text-[#38BDF8]">SELECT &gt;</span>
+                      </button>
+                    ))}
+                  </div>
+                  {searchQuery.trim() && (
+                    <div className="text-[10px] text-[#8B949E] pt-1 border-t border-[#1F2328]">
+                      Your instruction: <span className="text-[#F0F3F6]">&quot;{searchQuery}&quot;</span> will run immediately after selecting a company.
+                    </div>
+                  )}
+                </div>
+              )}
+
+            </div>
+          )}
 
         </main>
       )}
 
       {/* 3. VIEW 2: ACTIVE STOCK TERMINAL WORKSPACE */}
       {view === "terminal" && data && (
-        <main className="flex-1 w-full p-2 space-y-2">
+        <main className="flex-1 w-full max-w-7xl mx-auto p-2 sm:p-3 space-y-2">
           
           {/* Mobile Tab Switcher */}
           <div className="lg:hidden bg-[#121417] border border-[#1F2328] rounded-[2px] p-0.5 flex text-xs font-mono">
             <button
               onClick={() => setMobileTab("dashboard")}
-              className={`flex-1 py-1 px-2 rounded-[2px] font-bold transition text-center ${
+              className={`flex-1 py-1.5 px-2 rounded-[2px] font-bold transition text-center ${
                 mobileTab === "dashboard" ? "bg-[#1F2328] text-[#F0F3F6]" : "text-[#8B949E]"
               }`}
             >
@@ -562,25 +814,26 @@ export default function TerminalPage() {
             </button>
             <button
               onClick={() => setMobileTab("console")}
-              className={`flex-1 py-1 px-2 rounded-[2px] font-bold transition text-center ${
+              className={`flex-1 py-1.5 px-2 rounded-[2px] font-bold transition text-center flex items-center justify-center space-x-1 ${
                 mobileTab === "console" ? "bg-[#1F2328] text-[#F0F3F6]" : "text-[#8B949E]"
               }`}
             >
-              COMMAND_CONSOLE
+              <TerminalIcon className="w-3.5 h-3.5 text-[#38BDF8]" />
+              <span>COMMAND_CONSOLE</span>
             </button>
           </div>
 
-          {/* Active Security Ribbon Header - High Density Flat Strip */}
-          <div className="bg-[#121417] border border-[#1F2328] rounded-[2px] px-3 py-1.5 flex flex-wrap items-center justify-between gap-3 text-xs">
+          {/* Active Security Ribbon Header - Responsive Wrap */}
+          <div className="bg-[#121417] border border-[#1F2328] rounded-[2px] px-3 py-2 flex flex-wrap items-center justify-between gap-3 text-xs">
             <div className="flex items-center space-x-3">
-              <span className="font-mono text-sm font-bold text-[#F0F3F6] tracking-tight">
+              <span className="font-mono text-sm sm:text-base font-bold text-[#F0F3F6] tracking-tight">
                 {data.stock.name.toUpperCase()}
               </span>
               <span className="font-mono text-xs bg-[#16191D] text-[#8B949E] px-1.5 py-0.2 border border-[#1F2328] rounded-[2px]">
                 {data.stock.ticker}
               </span>
               <div className="flex items-baseline space-x-2 font-mono">
-                <span className="text-sm font-bold text-[#F0F3F6] tabular-nums">
+                <span className="text-sm sm:text-base font-bold text-[#F0F3F6] tabular-nums">
                   RM {data.stock.price.toFixed(2)}
                 </span>
                 <span className={`text-[11px] font-bold tabular-nums ${isPositive ? "text-[#10B981]" : "text-[#F85149]"}`}>
@@ -590,29 +843,29 @@ export default function TerminalPage() {
             </div>
 
             {/* Metrics Ribbon */}
-            <div className="flex items-center space-x-4 font-mono text-[11px] text-[#8B949E]">
-              <div>
+            <div className="flex items-center space-x-3 sm:space-x-4 font-mono text-[11px] text-[#8B949E] overflow-x-auto w-full sm:w-auto py-0.5">
+              <div className="shrink-0">
                 <span className="text-[10px] text-[#8B949E] mr-1">MCAP:</span>
                 <span className="text-[#F0F3F6] font-semibold tabular-nums">
                   RM {data.stock.market_cap ? (data.stock.market_cap / 1_000_000_000).toFixed(1) + "B" : "122.5B"}
                 </span>
               </div>
               <span className="text-[#1F2328]">|</span>
-              <div>
+              <div className="shrink-0">
                 <span className="text-[10px] text-[#8B949E] mr-1">P/E:</span>
                 <span className="text-[#F0F3F6] font-semibold tabular-nums">
                   {data.metrics.annualized_pe ? `${data.metrics.annualized_pe}x` : "12.8x"}
                 </span>
               </div>
               <span className="text-[#1F2328]">|</span>
-              <div>
+              <div className="shrink-0">
                 <span className="text-[10px] text-[#8B949E] mr-1">NET_MARGIN:</span>
                 <span className="text-[#10B981] font-semibold tabular-nums">
                   {data.metrics.net_margin_pct ? `${data.metrics.net_margin_pct}%` : "32.6%"}
                 </span>
               </div>
               <span className="text-[#1F2328]">|</span>
-              <div>
+              <div className="shrink-0">
                 <span className="text-[10px] text-[#8B949E] mr-1">GEARING:</span>
                 <span className="text-[#F0F3F6] font-semibold tabular-nums">
                   {data.metrics.gearing_ratio ? `${data.metrics.gearing_ratio}x` : "0.45x"}
@@ -627,7 +880,7 @@ export default function TerminalPage() {
             {/* LEFT COLUMN: Charts & Tabular Statement Excerpt */}
             <div className={`lg:col-span-6 space-y-2 ${mobileTab === "dashboard" ? "block" : "hidden lg:block"}`}>
               
-              {/* 1. Price Trajectory Chart - Sharp Solid Line (NO Gradients / NO Glow) */}
+              {/* 1. Price Trajectory Chart - Sharp Solid Line */}
               <div className="bg-[#121417] border border-[#1F2328] rounded-[2px] p-2 space-y-1.5">
                 <div className="flex items-center justify-between border-b border-[#1F2328] pb-1">
                   <div className="flex items-center space-x-1.5 font-mono text-[11px]">
@@ -653,7 +906,7 @@ export default function TerminalPage() {
                   </div>
                 </div>
 
-                <div className="h-40 w-full">
+                <div className="h-36 sm:h-40 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="2 2" stroke="#1F2328" />
@@ -671,7 +924,6 @@ export default function TerminalPage() {
                         }}
                         formatter={(value: any) => [`RM ${Number(value).toFixed(2)}`, "PRICE"]}
                       />
-                      {/* Strictly Solid Sharp Line: Fill none */}
                       <Area
                         type="monotone"
                         dataKey="price"
@@ -685,7 +937,7 @@ export default function TerminalPage() {
                 </div>
               </div>
 
-              {/* 2. Topline vs. Profit Bar Chart - Thin Bars & Desaturated Tones */}
+              {/* 2. Topline vs. Profit Bar Chart - High Density Timeline */}
               <div className="bg-[#121417] border border-[#1F2328] rounded-[2px] p-2 space-y-1.5">
                 <div className="flex items-center justify-between border-b border-[#1F2328] pb-1">
                   <div className="flex items-center space-x-1.5 font-mono text-[11px]">
@@ -727,7 +979,6 @@ export default function TerminalPage() {
                         ]}
                       />
                       <Legend wrapperStyle={{ fontSize: "10px", fontFamily: "monospace" }} />
-                      {/* Desaturated Muted Steel Blue for Revenue, Muted Emerald for Net Profit */}
                       <Bar dataKey="revenue" name="Revenue" fill="#64748B" barSize={12} radius={[0, 0, 0, 0]} isAnimationActive={false} />
                       <Bar dataKey="profit" name="Net Profit" fill="#10B981" barSize={12} radius={[0, 0, 0, 0]} isAnimationActive={false} />
                     </BarChart>
@@ -735,7 +986,7 @@ export default function TerminalPage() {
                 </div>
               </div>
 
-              {/* 3. Financial Statement Excerpt Table - High Density Tabular-Nums Zebra Striping */}
+              {/* 3. Financial Statement Excerpt Table */}
               <div className="bg-[#121417] border border-[#1F2328] rounded-[2px] p-2 space-y-1">
                 <div className="flex items-center justify-between border-b border-[#1F2328] pb-1">
                   <span className="font-mono font-bold text-[11px] text-[#F0F3F6]">
@@ -845,7 +1096,7 @@ export default function TerminalPage() {
             </div>
 
             {/* RIGHT COLUMN: Rigid Docked Command & Query Console */}
-            <div className={`lg:col-span-6 flex flex-col bg-[#121417] border border-[#1F2328] rounded-[2px] h-[670px] ${mobileTab === "console" ? "block" : "hidden lg:flex"}`}>
+            <div className={`lg:col-span-6 flex flex-col bg-[#121417] border border-[#1F2328] rounded-[2px] h-[550px] sm:h-[620px] lg:h-[670px] ${mobileTab === "console" ? "block" : "hidden lg:flex"}`}>
               
               {/* Console Header Bar */}
               <div className="p-2 bg-[#090A0C] border-b border-[#1F2328] flex items-center justify-between text-xs font-mono select-none">
@@ -853,7 +1104,7 @@ export default function TerminalPage() {
                   <TerminalIcon className="w-3.5 h-3.5 text-[#38BDF8]" />
                   <span className="font-bold text-[#F0F3F6]">INTERACTIVE_COMMAND_CONSOLE</span>
                   <span className="text-[10px] text-[#10B981] bg-[#16191D] px-1 border border-[#1F2328]">
-                    [READY]
+                    [ONLINE]
                   </span>
                 </div>
 
@@ -870,12 +1121,12 @@ export default function TerminalPage() {
                     }}
                     className="text-[10px] text-[#8B949E] hover:text-[#F0F3F6] px-1.5 py-0.5 hover:bg-[#1F2328] border border-[#1F2328] rounded-[2px] transition"
                   >
-                    [CLEAR_LOG]
+                    [CLEAR]
                   </button>
                 </div>
               </div>
 
-              {/* Discrete Query Shortcuts Toolbar (Header Utility Row, NO Floating Pills) */}
+              {/* Discrete Query Shortcuts Toolbar */}
               <div className="px-2 py-1 bg-[#121417] border-b border-[#1F2328] flex items-center space-x-2 overflow-x-auto text-[10px] font-mono whitespace-nowrap">
                 <span className="text-[#8B949E]">QUERIES:</span>
                 {DISCLOSURE_QUERIES.map((q, idx) => (
@@ -890,7 +1141,7 @@ export default function TerminalPage() {
                 ))}
               </div>
 
-              {/* Output Log Stream - Raw Monospace / Clean High-Density Reading */}
+              {/* Output Log Stream */}
               <div className="flex-1 p-2.5 overflow-y-auto space-y-3 text-xs font-mono">
                 {chatMessages.map((msg, index) => (
                   <div key={index} className="space-y-1">
@@ -907,7 +1158,7 @@ export default function TerminalPage() {
                       )}
                     </div>
 
-                    {/* Content Display (NO rounded bubbles, NO floating card styling) */}
+                    {/* Content Display */}
                     <div className={`p-2 border rounded-[2px] ${
                       msg.role === "user"
                         ? "bg-[#16191D] border-[#30363D] text-[#F0F3F6]"
@@ -999,7 +1250,7 @@ export default function TerminalPage() {
         </main>
       )}
 
-      {/* 4. Universal Document Ingestion Modal - Rigid Flat Styling */}
+      {/* 4. Universal Document Ingestion Modal */}
       {ingestModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-3 select-none">
           <div className="bg-[#121417] border border-[#1F2328] rounded-[2px] max-w-lg w-full p-4 space-y-3 font-mono text-xs">
@@ -1157,8 +1408,8 @@ export default function TerminalPage() {
       )}
 
       {/* 5. Minimal Institutional Footer */}
-      <footer className="bg-[#121417] border-t border-[#1F2328] py-1.5 px-3 text-[10px] font-mono text-[#8B949E] select-none">
-        <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-1">
+      <footer className="bg-[#121417] border-t border-[#1F2328] py-2 px-3 sm:px-4 text-[10px] font-mono text-[#8B949E] select-none">
+        <div className="w-full max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-1">
           <p>© 2026 BURSA_INTELLIGENCE // GROUNDED IN PUBLIC QUARTERLY FILINGS</p>
           <p>CMSA 2007 NON-ADVISORY COMPLIANT // 4-STAGE RAG (AST + CHROMADB + BM25 + FLASHRANK)</p>
         </div>
