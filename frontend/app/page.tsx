@@ -13,16 +13,12 @@ import {
   X,
   FileText,
   Upload,
-  Database,
   ArrowLeft,
   ChevronRight,
-  ShieldCheck,
   Calculator,
   RefreshCw,
   CheckCircle2,
-  AlertCircle,
   Check,
-  CornerDownLeft,
   ArrowRight
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
@@ -95,11 +91,11 @@ const CHART_INTERVALS: { [key: string]: { time: string; price: number; volume: n
 };
 
 const SUGGESTED_QUESTIONS = [
-  { label: "Revenue Drivers", prompt: "What are the primary revenue drivers and segmental results in Note B1?" },
-  { label: "Board Outlook", prompt: "Summarize the Board of Directors' prospects and Capex expectations in Note B3." },
-  { label: "Quarterly Variance", prompt: "Explain the pre-tax profit variance between current and preceding quarter per Note B5." },
-  { label: "Debt & Covenants", prompt: "What are the company's total borrowings, gearing ratio, and debt covenants?" },
-  { label: "DCF Valuation", prompt: "What are the fair value estimates and key sensitivity assumptions under DCF?" }
+  { label: "Revenue Drivers", prompt: "What are the primary revenue drivers and segment performance in the latest report?" },
+  { label: "Management Outlook", prompt: "Summarize the Board's business outlook and expected capital expenditures." },
+  { label: "Quarterly Variance", prompt: "Explain the pre-tax profit variance between the current and preceding quarter." },
+  { label: "Debt & Cash Position", prompt: "What are the company's total borrowings, gearing ratio, and cash reserves?" },
+  { label: "DCF Valuation", prompt: "What are the fair value estimates and valuation sensitivity assumptions?" }
 ];
 
 // Natural language query & ticker parser
@@ -156,7 +152,7 @@ function parseQuery(query: string) {
   }
 
   if (/analy[sz]e/i.test(query) && /financial|report|filing|quarterly/i.test(query)) {
-    instruction = "Please provide an executive summary and analysis of the latest financial report, highlighting revenue, profit margins, and key notes.";
+    instruction = "Please provide an executive summary and analysis of the latest financial report, highlighting revenue, profit margins, and key performance drivers.";
   }
 
   return {
@@ -178,9 +174,10 @@ export default function App() {
   const [loadingStockName, setLoadingStockName] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  // User-friendly Interactive Assistant Popup State
+  // Assistant Confirmation Popup - ONLY triggers after user finishes input and presses Enter
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [parsedIntent, setParsedIntent] = useState<ReturnType<typeof parseQuery>>({ company: null, instruction: "", raw: "" });
+  const confirmButtonRef = useRef<HTMLButtonElement>(null);
 
   // Time Interval & Charts
   const [selectedInterval, setSelectedInterval] = useState<string>("1D");
@@ -206,16 +203,12 @@ export default function App() {
   const [ingestLoading, setIngestLoading] = useState(false);
   const [ingestFeedback, setIngestFeedback] = useState<{ success: boolean; message: string; details?: any } | null>(null);
 
-  // Real-time query intent recognition
+  // Focus confirm button when popup appears
   useEffect(() => {
-    if (searchQuery.trim().length > 0) {
-      const intent = parseQuery(searchQuery);
-      setParsedIntent(intent);
-      setAssistantOpen(true);
-    } else {
-      setParsedIntent({ company: null, instruction: "", raw: "" });
+    if (assistantOpen) {
+      setTimeout(() => confirmButtonRef.current?.focus(), 50);
     }
-  }, [searchQuery]);
+  }, [assistantOpen]);
 
   const loadStockData = async (code: string, autoInstruction?: string) => {
     setLoading(true);
@@ -223,11 +216,10 @@ export default function App() {
     setError(null);
     setAssistantOpen(false);
 
-    // Identify stock display name
     const found = POPULAR_COMPANIES.find(c => c.code === code);
     setLoadingStockName(found ? found.name : `Stock ${code}`);
 
-    // Simulate animated loading milestones for transparent feedback
+    // Natural multi-step loading transitions
     const step2Timer = setTimeout(() => setLoadingStep(2), 500);
     const step3Timer = setTimeout(() => setLoadingStep(3), 1100);
     const step4Timer = setTimeout(() => setLoadingStep(4), 1800);
@@ -260,7 +252,7 @@ export default function App() {
       setChatMessages([
         {
           role: "assistant",
-          content: `Hello! I have loaded and indexed the latest quarterly financial disclosures for **${json.stock.name} (${json.stock.ticker})**.\n\n- **Current Price:** RM ${json.stock.price.toFixed(2)} (${json.stock.change_pct >= 0 ? "+" : ""}${json.stock.change_pct.toFixed(2)}%)\n- **Operating Revenue:** RM ${(json.financial_statement?.revenue || 7200000).toLocaleString()} ('000)\n- **Net Profit:** RM ${(json.financial_statement?.net_profit || 2350000).toLocaleString()} ('000)\n\nFeel free to ask me anything about the company's revenue drivers, balance sheet, or regulatory notes.`,
+          content: `Hello! I have loaded the latest financial statements and disclosures for **${json.stock.name} (${json.stock.ticker})**.\n\n- **Current Price:** RM ${json.stock.price.toFixed(2)} (${json.stock.change_pct >= 0 ? "+" : ""}${json.stock.change_pct.toFixed(2)}%)\n- **Operating Revenue:** RM ${(json.financial_statement?.revenue || 7200000).toLocaleString()} ('000)\n- **Net Profit:** RM ${(json.financial_statement?.net_profit || 2350000).toLocaleString()} ('000)\n\nAsk me any questions about the company's financial results, revenue drivers, or operating performance.`,
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
       ]);
@@ -296,17 +288,15 @@ export default function App() {
     chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages, chatLoading]);
 
+  // ON SUBMIT (Enter or button click): Trigger confirmation popup
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
 
+    // Parse the query and trigger confirmation popup ONLY when user submits
     const parsed = parseQuery(searchQuery);
-    const targetCode = parsed.company ? parsed.company.code : (POPULAR_COMPANIES.find(c => c.code === searchQuery.trim())?.code || "1155");
-    const instruction = parsed.instruction || "";
-
-    loadStockData(targetCode, instruction);
-    setSearchQuery("");
-    setAssistantOpen(false);
+    setParsedIntent(parsed);
+    setAssistantOpen(true);
   };
 
   const handleSendMessage = async (textToSend?: string, overrideCode?: string) => {
@@ -377,12 +367,12 @@ export default function App() {
         body: formData,
       });
 
-      if (!res.ok) throw new Error(`Ingest failed with status ${res.status}`);
+      if (!res.ok) throw new Error(`Upload failed with status ${res.status}`);
       const json = await res.json();
 
       setIngestFeedback({
         success: true,
-        message: json.message || "Filing ingested successfully.",
+        message: json.message || "Filing uploaded successfully.",
         details: json
       });
 
@@ -391,7 +381,7 @@ export default function App() {
         ...prev,
         {
           role: "assistant",
-          content: `I've successfully uploaded and indexed **${reportName}** for **${json.stock_code}** (${json.sections_indexed} sections and ${json.tables_extracted} tables extracted). You can now ask questions about this new report!`,
+          content: `I've successfully uploaded and processed **${reportName}** for **${json.stock_code}**. You can now ask questions about this report!`,
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
       ]);
@@ -405,7 +395,7 @@ export default function App() {
     } catch (err: any) {
       setIngestFeedback({
         success: false,
-        message: err.message || "Failed to ingest filing.",
+        message: err.message || "Failed to upload filing.",
       });
     } finally {
       setIngestLoading(false);
@@ -417,14 +407,17 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#090A0C] text-[#F0F3F6] flex flex-col font-sans">
       
-      {/* 1. Global Navigation Bar - Clean, Minimal Header (NO Logo & NO Upload Filing on Top) */}
+      {/* 1. Header (Clean & Minimal: NO Logo and NO Upload Filing Button) */}
       {view === "terminal" && (
         <header className="bg-[#121417] border-b border-[#1F2328] sticky top-0 z-40">
           <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 py-2.5 flex items-center justify-between gap-3">
             
             {/* Back to Start Page */}
             <button
-              onClick={() => setView("home")}
+              onClick={() => {
+                setView("home");
+                setAssistantOpen(false);
+              }}
               className="bg-[#16191D] hover:bg-[#1F2328] text-[#8B949E] hover:text-[#F0F3F6] px-3 py-1.5 rounded border border-[#1F2328] flex items-center space-x-1.5 transition text-xs font-medium"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
@@ -439,82 +432,72 @@ export default function App() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Switch stock (e.g. Tenaga, Maybank, CIMB, 5347)..."
+                  placeholder="Switch company (e.g. Tenaga, Maybank, CIMB, 5347)..."
                   className="w-full bg-[#090A0C] border border-[#1F2328] rounded pl-8 pr-16 py-1.5 text-xs text-[#F0F3F6] placeholder:text-[#6E7681] focus:outline-none focus:border-blue-500 transition"
                 />
                 <button
                   type="submit"
                   disabled={loading}
-                  className="absolute right-1 top-1/2 -translate-y-1/2 bg-[#1F2328] hover:bg-[#30363D] text-[#F0F3F6] px-2 py-0.5 rounded text-xs font-medium border border-[#30363D] transition disabled:opacity-40"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 bg-[#1F2328] hover:bg-[#30363D] text-[#F0F3F6] px-2.5 py-0.5 rounded text-xs font-medium border border-[#30363D] transition disabled:opacity-40"
                 >
                   {loading ? "..." : "Go"}
                 </button>
               </div>
             </form>
 
-            {/* Subtle Right Indicator */}
-            <span className="text-[11px] text-[#8B949E] font-mono hidden sm:inline">
-              KLSE • CMSA 2007
+            <span className="text-xs text-[#8B949E] hidden sm:inline">
+              Bursa Malaysia
             </span>
           </div>
         </header>
       )}
 
-      {/* 2. VIEW 1: CLEAN, USER-FRIENDLY START PAGE */}
+      {/* 2. VIEW 1: CLEAN MINIMAL START PAGE */}
       {view === "home" && (
-        <main className="flex-1 w-full max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-14 flex flex-col items-center justify-center space-y-7 sm:space-y-9">
+        <main className="flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 py-10 sm:py-16 flex flex-col items-center justify-center space-y-8">
           
-          {/* Hero Welcome */}
-          <div className="text-center space-y-2.5 max-w-xl w-full">
-            <div className="inline-flex items-center space-x-1.5 bg-[#121417] border border-[#1F2328] px-3 py-1 text-xs text-[#8B949E] rounded-full">
-              <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-              <span>Financial Report Intelligence</span>
-            </div>
+          {/* Minimalist Hero */}
+          <div className="text-center space-y-2 max-w-xl w-full">
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white tracking-tight">
               Bursa Market Research
             </h1>
             <p className="text-[#8B949E] text-xs sm:text-sm leading-relaxed max-w-md mx-auto">
-              Search any company name or ticker code to automatically pull quarterly filings, review financial statements, and ask analytical questions.
+              Search any company or ticker code to review quarterly earnings, financial statements, and explore insights.
             </p>
           </div>
 
-          {/* Prominent Search Box */}
-          <div className="w-full max-w-2xl relative">
+          {/* Clean Search Box - NO POPUP WHILE TYPING; ONLY OPENS AFTER USER PRESSES ENTER */}
+          <div className="w-full max-w-xl relative">
             <form onSubmit={handleSearchSubmit} className="relative">
               <div className="relative flex items-center shadow-lg">
                 <Search className="w-4 h-4 sm:w-5 sm:h-5 absolute left-3.5 text-[#8B949E]" />
                 <input
                   type="text"
                   value={searchQuery}
-                  onClick={() => setAssistantOpen(true)}
-                  onFocus={() => setAssistantOpen(true)}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    setAssistantOpen(true);
-                  }}
-                  placeholder="e.g. Tenaga, Maybank, or 'analyse financial report for Tenaga'..."
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Enter company or question (e.g. 'analyse report for Tenaga')..."
                   className="w-full bg-[#121417] border border-[#1F2328] hover:border-[#30363D] focus:border-blue-500 rounded-lg pl-10 pr-24 py-3 sm:py-3.5 text-xs sm:text-sm text-white placeholder:text-[#6E7681] focus:outline-none transition"
                   autoFocus
                 />
                 <button
                   type="submit"
                   disabled={loading || !searchQuery.trim()}
-                  className="absolute right-1.5 bg-blue-600 hover:bg-blue-500 text-white px-3.5 py-2 rounded text-xs font-semibold disabled:opacity-40 flex items-center space-x-1 transition"
+                  className="absolute right-1.5 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded text-xs font-semibold disabled:opacity-40 flex items-center space-x-1 transition"
                 >
-                  <span>Analyze</span>
+                  <span>Search</span>
                   <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             </form>
             <p className="text-[11px] text-[#8B949E] mt-2 text-center">
-              Type <span className="text-blue-400 font-medium">&quot;analyse financial report for Tenaga&quot;</span> or select an equity below
+              Press <kbd className="px-1.5 py-0.5 bg-[#16191D] border border-[#1F2328] rounded text-[10px] text-white">Enter</kbd> to confirm and search
             </p>
           </div>
 
-          {/* Popular Malaysian Companies Grid */}
-          <div className="w-full space-y-2.5">
+          {/* Popular Equities Grid */}
+          <div className="w-full space-y-2">
             <div className="flex items-center justify-between border-b border-[#1F2328] pb-1.5">
-              <span className="text-xs font-semibold text-white">Popular Equities</span>
+              <span className="text-xs font-semibold text-white">Popular Companies</span>
               <span className="text-[11px] text-[#8B949E]">Bursa Malaysia</span>
             </div>
 
@@ -547,8 +530,8 @@ export default function App() {
             </div>
           </div>
 
-          {/* Market Overview Indicators */}
-          <div className="w-full space-y-2.5">
+          {/* Market Overview Benchmarks */}
+          <div className="w-full space-y-2">
             <div className="flex items-center justify-between border-b border-[#1F2328] pb-1.5">
               <span className="text-xs font-semibold text-white">Market Overview</span>
               <span className="text-[11px] text-[#8B949E]">Live Benchmarks</span>
@@ -579,27 +562,23 @@ export default function App() {
           </div>
 
           {/* ========================================================================= */}
-          {/* USER-REQUESTED INTERACTIVE ASSISTANT POPUP AT BOTTOM OF START PAGE        */}
-          {/* Always appears when user clicks or inputs into the search space           */}
+          {/* USER CONFIRMATION POPUP: ONLY TRIGGERS ONCE USER FINISHES INPUT AND ENTERS */}
           {/* ========================================================================= */}
           {assistantOpen && (
-            <div className="fixed bottom-3 sm:bottom-5 left-1/2 -translate-x-1/2 w-[94%] max-w-lg z-40 bg-[#12161f] border border-blue-500/40 shadow-2xl rounded-xl p-4 text-xs animate-in fade-in slide-in-from-bottom-3 duration-200">
+            <div className="fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 w-[92%] max-w-lg z-40 bg-[#12161f] border border-blue-500/50 shadow-2xl rounded-xl p-4 text-xs animate-in fade-in slide-in-from-bottom-3 duration-200">
               
               {/* Header */}
-              <div className="flex items-center justify-between border-b border-[#1F2328] pb-2.5 mb-3">
+              <div className="flex items-center justify-between border-b border-[#1F2328] pb-2 mb-2.5">
                 <div className="flex items-center space-x-2">
-                  <div className="w-6 h-6 rounded-full bg-blue-600/20 text-blue-400 flex items-center justify-center">
-                    <Sparkles className="w-3.5 h-3.5" />
+                  <div className="w-5 h-5 rounded-full bg-blue-600/20 text-blue-400 flex items-center justify-center">
+                    <Sparkles className="w-3 h-3" />
                   </div>
-                  <div>
-                    <span className="font-bold text-white text-xs block">Research Assistant</span>
-                    <span className="text-[10px] text-[#8B949E]">Target company & instruction confirmation</span>
-                  </div>
+                  <span className="font-bold text-white text-xs">Confirm Target & Query</span>
                 </div>
                 <button
                   onClick={() => setAssistantOpen(false)}
                   className="text-[#8B949E] hover:text-white p-1 rounded hover:bg-[#1F2328] transition"
-                  title="Close Assistant"
+                  title="Close"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -610,10 +589,10 @@ export default function App() {
                 <div className="space-y-3">
                   <div className="bg-[#090c14] border border-slate-800 p-3 rounded-lg">
                     <div className="flex items-center justify-between text-[11px] text-[#8B949E] mb-1">
-                      <span>Identified Company:</span>
-                      <span className="text-emerald-400 font-semibold flex items-center space-x-1">
+                      <span>Target Company:</span>
+                      <span className="text-emerald-400 font-medium flex items-center space-x-1">
                         <Check className="w-3 h-3" />
-                        <span>Ready</span>
+                        <span>Identified</span>
                       </span>
                     </div>
                     <div className="flex items-baseline justify-between">
@@ -627,7 +606,7 @@ export default function App() {
 
                     {parsedIntent.instruction ? (
                       <div className="mt-2.5 pt-2 border-t border-slate-800 text-[11px]">
-                        <span className="text-[#8B949E] block mb-1">Instruction to execute in chatbot:</span>
+                        <span className="text-[#8B949E] block mb-1">Your analytical request:</span>
                         <div className="text-blue-300 bg-[#141b28] p-2 rounded border border-blue-900/40 font-medium">
                           &quot;{parsedIntent.instruction}&quot;
                         </div>
@@ -635,59 +614,60 @@ export default function App() {
                     ) : null}
                   </div>
 
-                  {/* Primary Action Button */}
+                  {/* Primary Action Button (Focused for instant Enter key submission) */}
                   <button
+                    ref={confirmButtonRef}
                     onClick={() => {
                       const comp = parsedIntent.company!;
                       loadStockData(comp.code, parsedIntent.instruction);
                     }}
-                    className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 px-3 rounded-lg flex items-center justify-center space-x-2 transition text-xs shadow-md"
+                    className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 px-3 rounded-lg flex items-center justify-center space-x-2 transition text-xs shadow-md focus:ring-2 focus:ring-blue-400"
                   >
                     <span>
-                      {parsedIntent.instruction ? `Confirm & Analyze ${parsedIntent.company.name}` : `View ${parsedIntent.company.name} Financials`}
+                      {parsedIntent.instruction ? `Run Analysis on ${parsedIntent.company.name}` : `View ${parsedIntent.company.name} Financials`}
                     </span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
 
-                  {/* Quick Suggested Queries */}
+                  {/* Quick Suggestions */}
                   <div className="pt-2 border-t border-[#1F2328]">
-                    <span className="text-[10px] text-[#8B949E] block mb-1.5 font-medium">Or run a suggested analytical prompt:</span>
+                    <span className="text-[10px] text-[#8B949E] block mb-1.5">Or choose a common topic:</span>
                     <div className="flex flex-wrap gap-1.5">
                       <button
                         onClick={() => {
                           const comp = parsedIntent.company!;
-                          loadStockData(comp.code, "Summarize revenue drivers and segment performance from Note B1.");
+                          loadStockData(comp.code, "Summarize revenue drivers and segment performance from the latest quarterly report.");
                         }}
                         className="bg-[#16191D] hover:bg-[#1F2328] text-[#8B949E] hover:text-white text-[11px] px-2 py-1 rounded border border-[#1F2328] transition"
                       >
-                        Revenue & Margins (Note B1)
+                        Revenue & Margins
                       </button>
                       <button
                         onClick={() => {
                           const comp = parsedIntent.company!;
-                          loadStockData(comp.code, "What are the management's key operating risks and market outlook in Note B3?");
+                          loadStockData(comp.code, "What are the management's key operating risks and market outlook?");
                         }}
                         className="bg-[#16191D] hover:bg-[#1F2328] text-[#8B949E] hover:text-white text-[11px] px-2 py-1 rounded border border-[#1F2328] transition"
                       >
-                        Board Outlook (Note B3)
+                        Operating Outlook
                       </button>
                       <button
                         onClick={() => {
                           const comp = parsedIntent.company!;
-                          loadStockData(comp.code, "Summarize total borrowings, gearing ratio, and debt obligations.");
+                          loadStockData(comp.code, "Summarize total borrowings, gearing ratio, and cash position.");
                         }}
                         className="bg-[#16191D] hover:bg-[#1F2328] text-[#8B949E] hover:text-white text-[11px] px-2 py-1 rounded border border-[#1F2328] transition"
                       >
-                        Debt & Gearing
+                        Debt & Cash
                       </button>
                     </div>
                   </div>
                 </div>
               ) : (
-                /* Case 2: No exact match yet */
+                /* Case 2: Ambiguous Query - Quick Company Selector */
                 <div className="space-y-2.5">
                   <p className="text-[#8B949E] text-xs">
-                    Please select a target company to analyze with your prompt:
+                    Please select a company to run your query:
                   </p>
                   <div className="grid grid-cols-2 gap-2">
                     {POPULAR_COMPANIES.slice(0, 4).map((c) => (
@@ -707,11 +687,6 @@ export default function App() {
                       </button>
                     ))}
                   </div>
-                  {searchQuery.trim() && (
-                    <div className="text-[11px] text-[#8B949E] pt-2 border-t border-[#1F2328]">
-                      Your request: <span className="text-white font-medium">&quot;{searchQuery}&quot;</span> will run automatically once a company is selected.
-                    </div>
-                  )}
                 </div>
               )}
 
@@ -742,7 +717,7 @@ export default function App() {
               }`}
             >
               <MessageSquare className="w-3.5 h-3.5" />
-              <span>AI Research Assistant</span>
+              <span>AI Research Copilot</span>
             </button>
           </div>
 
@@ -910,7 +885,7 @@ export default function App() {
               {/* 3. Financial Statement Excerpt Table */}
               <div className="bg-[#121417] border border-[#1F2328] rounded-lg p-3 sm:p-4 space-y-2">
                 <div className="flex items-center justify-between border-b border-[#1F2328] pb-2">
-                  <span className="font-semibold text-xs text-white">Financial Statement Excerpt</span>
+                  <span className="font-semibold text-xs text-white">Financial Statement Summary</span>
                   <span className="text-[11px] text-[#8B949E]">RM &apos;000</span>
                 </div>
 
@@ -984,14 +959,14 @@ export default function App() {
                 </div>
               </div>
 
-              {/* 4. DCF Sensitivity Scenario Card */}
+              {/* 4. DCF Valuation Scenarios */}
               <div className="bg-[#121417] border border-[#1F2328] rounded-lg p-3 sm:p-4 space-y-2">
                 <div className="flex items-center justify-between border-b border-[#1F2328] pb-1.5">
                   <div className="flex items-center space-x-2">
                     <Calculator className="w-4 h-4 text-blue-400" />
                     <span className="font-semibold text-xs text-white">5-Year DCF Valuation Scenarios</span>
                   </div>
-                  <span className="text-[11px] text-[#8B949E]">Cash Flow Sensitivity</span>
+                  <span className="text-[11px] text-[#8B949E]">Sensitivity Analysis</span>
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 text-center text-xs">
@@ -1014,7 +989,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* RIGHT COLUMN: User-Friendly AI Financial Copilot */}
+            {/* RIGHT COLUMN: AI Financial Research Copilot */}
             <div className={`lg:col-span-5 flex flex-col bg-[#121417] border border-[#1F2328] rounded-lg h-[520px] sm:h-[600px] lg:h-[680px] ${activeTab === "chat" ? "block" : "hidden lg:flex"}`}>
               
               {/* Copilot Header */}
@@ -1025,38 +1000,25 @@ export default function App() {
                   </div>
                   <div>
                     <h3 className="font-bold text-xs text-white">AI Research Copilot</h3>
-                    <p className="text-[10px] text-[#8B949E]">Active: {data.stock.name} ({data.stock.ticker})</p>
+                    <p className="text-[10px] text-[#8B949E]">{data.stock.name} ({data.stock.ticker})</p>
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => {
-                      setIngestStockCode(data.stock.code);
-                      setIngestModalOpen(true);
-                    }}
-                    className="text-[11px] text-[#8B949E] hover:text-white px-2 py-1 rounded hover:bg-[#1F2328] border border-transparent hover:border-[#30363D] transition flex items-center space-x-1"
-                    title="Upload custom filing"
-                  >
-                    <Upload className="w-3 h-3" />
-                    <span>Upload</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setChatMessages([
-                        {
-                          role: "assistant",
-                          content: `Chat history cleared. Active context is **${data.stock.name} (${data.stock.ticker})**. How can I help you today?`,
-                          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                        }
-                      ]);
-                    }}
-                    className="text-[11px] text-[#8B949E] hover:text-white px-2 py-1 rounded hover:bg-[#1F2328] border border-transparent hover:border-[#30363D] transition"
-                    title="Clear conversation"
-                  >
-                    Clear
-                  </button>
-                </div>
+                <button
+                  onClick={() => {
+                    setChatMessages([
+                      {
+                        role: "assistant",
+                        content: `Chat history cleared. Active context is **${data.stock.name} (${data.stock.ticker})**. How can I help you today?`,
+                        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                      }
+                    ]);
+                  }}
+                  className="text-[11px] text-[#8B949E] hover:text-white px-2 py-1 rounded hover:bg-[#1F2328] border border-transparent hover:border-[#30363D] transition"
+                  title="Clear conversation"
+                >
+                  Clear Chat
+                </button>
               </div>
 
               {/* Suggested Questions Pills */}
@@ -1124,7 +1086,7 @@ export default function App() {
                         <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
                         <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
                       </div>
-                      <span className="text-[11px] text-[#8B949E]">Reading Part B regulatory notes & verifying tables...</span>
+                      <span className="text-[11px] text-[#8B949E]">Reviewing quarterly disclosures...</span>
                     </div>
                   </div>
                 )}
@@ -1157,7 +1119,7 @@ export default function App() {
                   </button>
                 </form>
                 <p className="text-[10px] text-[#8B949E] text-center mt-1.5">
-                  Answers cite official Bursa Malaysia quarterly report disclosures (CMSA 2007 compliant)
+                  AI insights grounded in official quarterly reports
                 </p>
               </div>
 
@@ -1168,11 +1130,11 @@ export default function App() {
       )}
 
       {/* ========================================================================= */}
-      {/* 4. DEDICATED TRANSPARENT LOADING INTERFACE AFTER SUBMITTING PROMPT         */}
-      {/* Shows animated step-by-step progress while pulling & indexing filing      */}
+      {/* 4. CLEAN, HUMAN-FRIENDLY LOADING OVERLAY                                    */}
+      {/* Shows animated step-by-step progress without any implementation jargon    */}
       {/* ========================================================================= */}
       {loading && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#12161f] border border-slate-700/80 rounded-2xl max-w-md w-full p-6 text-center shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
             
             {/* Animated Loading Rings & Document Icon */}
@@ -1187,14 +1149,14 @@ export default function App() {
             {/* Title & Subtitle */}
             <div className="space-y-1">
               <h3 className="text-base font-bold text-white">
-                Analyzing {loadingStockName || "Financial Filing"}...
+                Analyzing {loadingStockName || "Company Reports"}...
               </h3>
               <p className="text-xs text-slate-400">
-                Retrieving regulatory disclosures & running 4-Stage Hierarchical RAG
+                Pulling official quarterly disclosures and generating insights
               </p>
             </div>
 
-            {/* Multi-Step Ingestion Checklist */}
+            {/* Multi-Step Ingestion Checklist (Zero tech jargon) */}
             <div className="bg-[#090c14] border border-slate-800 rounded-xl p-3.5 text-left text-xs space-y-2.5 font-sans">
               <div className="flex items-center space-x-2.5">
                 {loadingStep > 1 ? (
@@ -1216,7 +1178,7 @@ export default function App() {
                   <div className="w-4 h-4 rounded-full border border-slate-700 shrink-0" />
                 )}
                 <span className={loadingStep >= 2 ? "text-slate-200 font-medium" : "text-slate-500"}>
-                  2. AST table extraction & section hierarchy indexing
+                  2. Extracting financial tables & explanatory notes
                 </span>
               </div>
 
@@ -1229,7 +1191,7 @@ export default function App() {
                   <div className="w-4 h-4 rounded-full border border-slate-700 shrink-0" />
                 )}
                 <span className={loadingStep >= 3 ? "text-slate-200 font-medium" : "text-slate-500"}>
-                  3. Indexing into Hybrid ChromaDB + BM25 RAG space
+                  3. Analyzing revenue drivers & profit margins
                 </span>
               </div>
 
@@ -1240,7 +1202,7 @@ export default function App() {
                   <div className="w-4 h-4 rounded-full border border-slate-700 shrink-0" />
                 )}
                 <span className={loadingStep >= 4 ? "text-emerald-400 font-medium" : "text-slate-500"}>
-                  4. Initializing AI Research Workspace & Copilot
+                  4. Preparing research overview & copilot
                 </span>
               </div>
             </div>
@@ -1257,168 +1219,11 @@ export default function App() {
         </div>
       )}
 
-      {/* 5. Document Ingestion Modal */}
-      {ingestModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-3">
-          <div className="bg-[#121417] border border-[#1F2328] rounded-lg max-w-lg w-full p-4 sm:p-5 space-y-3.5 text-xs shadow-2xl">
-            
-            {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-[#1F2328] pb-2.5">
-              <div className="flex items-center space-x-2">
-                <FileText className="w-4 h-4 text-emerald-400" />
-                <h3 className="font-bold text-sm text-white">Upload Financial Filing</h3>
-              </div>
-              <button
-                onClick={() => {
-                  setIngestModalOpen(false);
-                  setIngestFeedback(null);
-                }}
-                className="text-[#8B949E] hover:text-white p-1 rounded"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Target Stock Code */}
-            <div className="space-y-1">
-              <label className="text-[11px] font-medium text-[#8B949E] block">Bursa Stock Code</label>
-              <div className="flex items-center space-x-2">
-                <input
-                  type="text"
-                  value={ingestStockCode}
-                  onChange={(e) => setIngestStockCode(e.target.value)}
-                  placeholder="e.g. 1155"
-                  className="bg-[#090A0C] border border-[#1F2328] rounded px-2.5 py-1.5 text-xs text-white w-24 font-mono focus:outline-none focus:border-blue-500"
-                />
-                <span className="text-xs text-[#8B949E]">
-                  Active: <strong className="text-white">{data?.stock?.name || "Maybank"}</strong> ({ingestStockCode}.KL)
-                </span>
-              </div>
-            </div>
-
-            {/* Ingestion Mode Toggle */}
-            <div className="flex items-center space-x-1 border-b border-[#1F2328] pb-2 text-xs">
-              <button
-                onClick={() => setIngestMode("file")}
-                className={`py-1 px-3 rounded font-medium transition ${
-                  ingestMode === "file" ? "bg-blue-600 text-white" : "text-[#8B949E] hover:text-white"
-                }`}
-              >
-                Upload File (.PDF, .MD, .TXT)
-              </button>
-              <button
-                onClick={() => setIngestMode("text")}
-                className={`py-1 px-3 rounded font-medium transition ${
-                  ingestMode === "text" ? "bg-blue-600 text-white" : "text-[#8B949E] hover:text-white"
-                }`}
-              >
-                Paste Report Text
-              </button>
-            </div>
-
-            {/* File Upload Area */}
-            {ingestMode === "file" && (
-              <div className="space-y-2">
-                <div
-                  className="border border-dashed border-[#1F2328] hover:border-blue-500 p-5 text-center cursor-pointer transition bg-[#090A0C] rounded"
-                  onClick={() => document.getElementById("report-file-input")?.click()}
-                >
-                  <Upload className="w-7 h-7 text-[#8B949E] mx-auto mb-2" />
-                  <p className="text-xs font-semibold text-white">
-                    {ingestFile ? ingestFile.name : "Click to select or drag & drop a quarterly report"}
-                  </p>
-                  <p className="text-[10px] text-[#8B949E] mt-1">Supports Bursa Quarterly PDF reports, Markdown, and Text</p>
-                  {ingestFile && (
-                    <span className="inline-block mt-2 text-[10px] bg-emerald-950/60 text-emerald-400 px-2 py-0.5 rounded border border-emerald-800">
-                      {(ingestFile.size / 1024).toFixed(1)} KB ready for indexing
-                    </span>
-                  )}
-                </div>
-                <input
-                  id="report-file-input"
-                  type="file"
-                  accept=".pdf,.md,.txt"
-                  className="hidden"
-                  onChange={(e) => {
-                    if (e.target.files && e.target.files[0]) {
-                      setIngestFile(e.target.files[0]);
-                    }
-                  }}
-                />
-              </div>
-            )}
-
-            {/* Text Paste Area */}
-            {ingestMode === "text" && (
-              <div className="space-y-1">
-                <label className="text-[11px] font-medium text-[#8B949E] block">Paste Financial Disclosure Text</label>
-                <textarea
-                  rows={6}
-                  value={ingestText}
-                  onChange={(e) => setIngestText(e.target.value)}
-                  placeholder="Paste statement tables or Part B explanatory notes..."
-                  className="w-full bg-[#090A0C] border border-[#1F2328] rounded p-2.5 text-xs text-white focus:outline-none focus:border-blue-500"
-                />
-              </div>
-            )}
-
-            {/* Feedback Message */}
-            {ingestFeedback && (
-              <div className={`p-2.5 rounded text-xs border ${
-                ingestFeedback.success
-                  ? "bg-emerald-950/40 border-emerald-800 text-emerald-300"
-                  : "bg-rose-950/40 border-rose-800 text-rose-300"
-              }`}>
-                <p className="font-semibold">{ingestFeedback.message}</p>
-                {ingestFeedback.details && (
-                  <p className="text-[10px] text-[#8B949E] mt-0.5">
-                    Indexed {ingestFeedback.details.sections_indexed} sections and {ingestFeedback.details.tables_extracted} tables into RAG.
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Modal Controls */}
-            <div className="flex items-center justify-end space-x-2 pt-2 border-t border-[#1F2328]">
-              <button
-                type="button"
-                onClick={() => {
-                  setIngestModalOpen(false);
-                  setIngestFeedback(null);
-                }}
-                className="px-3 py-1.5 text-xs text-[#8B949E] hover:text-white rounded hover:bg-[#1F2328] transition"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleIngestReport}
-                disabled={ingestLoading || (ingestMode === "file" && !ingestFile) || (ingestMode === "text" && !ingestText.trim())}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-1.5 rounded text-xs font-semibold transition disabled:opacity-40 flex items-center space-x-1.5"
-              >
-                {ingestLoading ? (
-                  <>
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>Indexing...</span>
-                  </>
-                ) : (
-                  <>
-                    <Database className="w-3.5 h-3.5" />
-                    <span>Index Report</span>
-                  </>
-                )}
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
-
-      {/* 6. Clean Footer */}
-      <footer className="bg-[#121417] border-t border-[#1F2328] py-2.5 px-3 sm:px-6 text-xs text-[#8B949E]">
+      {/* 5. Clean Minimal Footer */}
+      <footer className="bg-[#121417] border-t border-[#1F2328] py-3 px-4 text-xs text-[#8B949E]">
         <div className="w-full max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-1 text-[11px]">
-          <p>© 2026 Bursa Intelligence. Financial data grounded in official Bursa Malaysia filings.</p>
-          <p>CMSA 2007 Compliant • 4-Stage RAG (AST + ChromaDB + BM25 + FlashRank)</p>
+          <p>© 2026 Bursa Intelligence. Public market data and financial disclosures.</p>
+          <p>For educational & research purposes only.</p>
         </div>
       </footer>
 
