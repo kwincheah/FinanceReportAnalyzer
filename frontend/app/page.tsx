@@ -254,6 +254,8 @@ export default function App() {
   // Time Interval & Charts
   const [selectedInterval, setSelectedInterval] = useState<string>("1D");
   const [chartData, setChartData] = useState(CHART_INTERVALS["1D"]);
+  const [chartView, setChartView] = useState<"price" | "financials" | "split">("price");
+  const [homeSectorFilter, setHomeSectorFilter] = useState<string>("all");
 
   // Analyst Chat Messages
   const [chatMessages, setChatMessages] = useState<
@@ -566,19 +568,45 @@ export default function App() {
 
       {/* 2. VIEW 1: CLEAN MINIMAL START PAGE */}
       {view === "home" && (
-        <main className="flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-14 flex flex-col items-center justify-center space-y-9">
+        <main className="flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-10 flex flex-col items-center justify-center space-y-7">
           
           {/* Minimalist Hero */}
-          <div className="text-center space-y-2.5 max-w-xl w-full">
+          <div className="text-center space-y-2 max-w-xl w-full">
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-slate-900 dark:text-white tracking-tight">
               Bursa Market Research
             </h1>
             <p className="text-slate-600 dark:text-[#8B949E] text-xs sm:text-sm leading-relaxed max-w-md mx-auto">
-              Search any company or ticker code to review quarterly earnings, financial disclosures, and AI-grounded insights.
+              Institutional intelligence & verified financial disclosures across Bursa Malaysia equities.
             </p>
           </div>
 
-          {/* Clean Search Box - NO POPUP WHILE TYPING; ONLY OPENS AFTER USER PRESSES ENTER */}
+          {/* 1. Market Pulse Benchmarks (4 Tidy Tiles) */}
+          <div className="w-full">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+              <div className="bg-white dark:bg-[#121417] p-3 rounded-xl border border-slate-200 dark:border-[#1F2328] shadow-xs flex flex-col justify-between">
+                <span className="text-[10px] text-slate-500 dark:text-[#8B949E] font-medium uppercase tracking-wider block mb-0.5">FBM KLCI Index</span>
+                <span className="text-sm font-bold text-slate-900 dark:text-white tabular-nums">1,624.18</span>
+                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5">+5.12 (+0.32%)</span>
+              </div>
+              <div className="bg-white dark:bg-[#121417] p-3 rounded-xl border border-slate-200 dark:border-[#1F2328] shadow-xs flex flex-col justify-between">
+                <span className="text-[10px] text-slate-500 dark:text-[#8B949E] font-medium uppercase tracking-wider block mb-0.5">USD / MYR</span>
+                <span className="text-sm font-bold text-slate-900 dark:text-white tabular-nums">4.4125</span>
+                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5">-0.0065 (-0.15%)</span>
+              </div>
+              <div className="bg-white dark:bg-[#121417] p-3 rounded-xl border border-slate-200 dark:border-[#1F2328] shadow-xs flex flex-col justify-between">
+                <span className="text-[10px] text-slate-500 dark:text-[#8B949E] font-medium uppercase tracking-wider block mb-0.5">Brent Crude</span>
+                <span className="text-sm font-bold text-slate-900 dark:text-white tabular-nums">$73.87</span>
+                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5">+$0.48 (+0.65%)</span>
+              </div>
+              <div className="bg-white dark:bg-[#121417] p-3 rounded-xl border border-slate-200 dark:border-[#1F2328] shadow-xs flex flex-col justify-between">
+                <span className="text-[10px] text-slate-500 dark:text-[#8B949E] font-medium uppercase tracking-wider block mb-0.5">BNM OPR Rate</span>
+                <span className="text-sm font-bold text-slate-900 dark:text-white tabular-nums">3.00%</span>
+                <span className="text-[10px] text-slate-500 dark:text-[#8B949E] font-medium mt-0.5">Neutral Stance</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 2. Clean Search Box */}
           <div className="w-full max-w-xl relative">
             <form onSubmit={handleSearchSubmit} className="relative">
               <div className="relative flex items-center shadow-md hover:shadow-lg transition-shadow rounded-xl">
@@ -587,7 +615,7 @@ export default function App() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Enter company or query (e.g. 'analyse report for Tenaga')..."
+                  placeholder="Enter company or prompt (e.g. 'Tenaga quarterly revenue')..."
                   className="w-full bg-white dark:bg-[#121417] border border-slate-200 dark:border-[#1F2328] hover:border-slate-300 dark:hover:border-[#30363D] focus:border-blue-500 dark:focus:border-blue-500 rounded-xl pl-11 pr-28 py-3.5 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-[#6E7681] focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition"
                   autoFocus
                 />
@@ -616,76 +644,149 @@ export default function App() {
             </p>
           </div>
 
-          {/* Popular Equities Grid */}
+          {/* 3. Popular Bursa Equities with Sector Filter Tabs */}
           <div className="w-full space-y-2.5">
-            <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#1F2328] pb-2">
-              <span className="text-xs font-semibold text-slate-900 dark:text-white">Popular Bursa Equities</span>
-              <span className="text-[11px] text-slate-500 dark:text-[#8B949E]">KLSE Active</span>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 dark:border-[#1F2328] pb-2 gap-2">
+              <div className="flex items-center space-x-2">
+                <span className="text-xs font-semibold text-slate-900 dark:text-white">Popular Bursa Equities</span>
+                <span className="text-[10px] font-mono bg-slate-100 dark:bg-[#16191D] text-slate-600 dark:text-[#8B949E] px-2 py-0.5 rounded border border-slate-200 dark:border-[#1F2328]">
+                  KLSE Active
+                </span>
+              </div>
+
+              {/* Sector Filter Chips */}
+              <div className="flex items-center space-x-1 text-[11px] overflow-x-auto">
+                {[
+                  { id: "all", label: "All" },
+                  { id: "banking", label: "Banking" },
+                  { id: "utilities", label: "Utilities & Power" },
+                  { id: "other", label: "Retail & Health" },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setHomeSectorFilter(tab.id)}
+                    className={`px-2.5 py-1 rounded-lg font-medium transition whitespace-nowrap ${
+                      homeSectorFilter === tab.id
+                        ? "bg-blue-600 text-white shadow-2xs"
+                        : "bg-slate-100 dark:bg-[#16191D] text-slate-600 dark:text-[#8B949E] hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-[#1F2328]"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
+            {/* Symmetrical Equity Tiles (Fixed Height & Balanced Alignment) */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-              {POPULAR_COMPANIES.map((company) => (
-                <button
-                  key={company.code}
-                  onClick={() => loadStockData(company.code)}
-                  disabled={loading}
-                  className="bg-white dark:bg-[#121417] hover:bg-slate-50 dark:hover:bg-[#16191D] p-3.5 rounded-xl border border-slate-200 dark:border-[#1F2328] hover:border-blue-500/50 dark:hover:border-blue-500/50 text-left transition-all duration-150 flex flex-col justify-between group active:scale-[0.98] shadow-xs hover:shadow-sm"
-                >
-                  <div>
-                    <div className="flex items-center justify-between w-full mb-1">
-                      <span className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                        {company.name}
+              {POPULAR_COMPANIES
+                .filter((company) => {
+                  if (homeSectorFilter === "banking") return company.sector.toLowerCase().includes("bank");
+                  if (homeSectorFilter === "utilities") return company.sector.toLowerCase().includes("utilit") || company.sector.toLowerCase().includes("power") || company.sector.toLowerCase().includes("gas");
+                  if (homeSectorFilter === "other") return !company.sector.toLowerCase().includes("bank") && !company.sector.toLowerCase().includes("utilit");
+                  return true;
+                })
+                .map((company) => (
+                  <button
+                    key={company.code}
+                    onClick={() => loadStockData(company.code)}
+                    disabled={loading}
+                    className="bg-white dark:bg-[#121417] hover:bg-slate-50 dark:hover:bg-[#16191D] p-3.5 rounded-xl border border-slate-200 dark:border-[#1F2328] hover:border-blue-500/60 dark:hover:border-blue-500/60 text-left transition-all duration-150 flex flex-col justify-between h-[112px] group active:scale-[0.98] shadow-xs hover:shadow-sm"
+                  >
+                    {/* Top Row: Sector Badge + Change Pill */}
+                    <div className="flex items-center justify-between w-full">
+                      <span className="text-[10px] text-slate-500 dark:text-[#8B949E] font-medium truncate max-w-[90px]">
+                        {company.sector.split("&")[0].trim()}
                       </span>
-                      <span className={`text-[11px] font-semibold tabular-nums ${company.positive ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
+                      <span className={`text-[10px] font-semibold tabular-nums px-1.5 py-0.5 rounded ${
+                        company.positive
+                          ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50"
+                          : "bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50"
+                      }`}>
                         {company.positive ? "+" : ""}{company.change.toFixed(2)}%
                       </span>
                     </div>
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500 line-clamp-1 mb-2">
-                      {company.sector}
-                    </p>
-                  </div>
 
-                  <div className="flex items-baseline justify-between pt-1 border-t border-slate-100 dark:border-[#1F2328]">
-                    <span className="text-[10px] text-slate-500 dark:text-[#8B949E] font-mono">
-                      {company.ticker}
-                    </span>
-                    <span className="text-xs font-bold text-slate-900 dark:text-white tabular-nums">
-                      RM {company.price.toFixed(2)}
-                    </span>
-                  </div>
-                </button>
-              ))}
+                    {/* Middle: Company Name */}
+                    <div className="my-1">
+                      <span className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors line-clamp-1">
+                        {company.name}
+                      </span>
+                    </div>
+
+                    {/* Bottom: Ticker Chip + Live Price */}
+                    <div className="flex items-baseline justify-between pt-1.5 border-t border-slate-100 dark:border-[#1F2328] w-full">
+                      <span className="text-[10px] text-slate-500 dark:text-[#8B949E] font-mono">
+                        {company.ticker}
+                      </span>
+                      <span className="text-xs font-bold text-slate-900 dark:text-white tabular-nums">
+                        RM {company.price.toFixed(2)}
+                      </span>
+                    </div>
+                  </button>
+                ))}
             </div>
           </div>
 
-          {/* Market Overview Benchmarks */}
+          {/* 4. Quick Analytical Topic Tiles */}
           <div className="w-full space-y-2.5">
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#1F2328] pb-2">
-              <span className="text-xs font-semibold text-slate-900 dark:text-white">Market Benchmarks</span>
-              <span className="text-[11px] text-slate-500 dark:text-[#8B949E]">Real-Time Indicators</span>
+              <span className="text-xs font-semibold text-slate-900 dark:text-white">Quick Research Modules</span>
+              <span className="text-[11px] text-slate-500 dark:text-[#8B949E]">1-Click Copilot Inquiries</span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
-              <div className="bg-white dark:bg-[#121417] p-3.5 rounded-xl border border-slate-200 dark:border-[#1F2328] shadow-xs">
-                <span className="text-[11px] text-slate-500 dark:text-[#8B949E] block mb-0.5">FBM KLCI Index</span>
-                <span className="text-sm font-bold text-slate-900 dark:text-white tabular-nums">1,624.18</span>
-                <span className="text-[11px] text-emerald-600 dark:text-emerald-400 block font-medium mt-0.5">+5.12 (+0.32%)</span>
-              </div>
-              <div className="bg-white dark:bg-[#121417] p-3.5 rounded-xl border border-slate-200 dark:border-[#1F2328] shadow-xs">
-                <span className="text-[11px] text-slate-500 dark:text-[#8B949E] block mb-0.5">USD / MYR</span>
-                <span className="text-sm font-bold text-slate-900 dark:text-white tabular-nums">4.4125</span>
-                <span className="text-[11px] text-emerald-600 dark:text-emerald-400 block font-medium mt-0.5">-0.0065 (-0.15%)</span>
-              </div>
-              <div className="bg-white dark:bg-[#121417] p-3.5 rounded-xl border border-slate-200 dark:border-[#1F2328] shadow-xs">
-                <span className="text-[11px] text-slate-500 dark:text-[#8B949E] block mb-0.5">Brent Crude</span>
-                <span className="text-sm font-bold text-slate-900 dark:text-white tabular-nums">$73.87</span>
-                <span className="text-[11px] text-emerald-600 dark:text-emerald-400 block font-medium mt-0.5">+$0.48 (+0.65%)</span>
-              </div>
-              <div className="bg-white dark:bg-[#121417] p-3.5 rounded-xl border border-slate-200 dark:border-[#1F2328] shadow-xs">
-                <span className="text-[11px] text-slate-500 dark:text-[#8B949E] block mb-0.5">BNM OPR Rate</span>
-                <span className="text-sm font-bold text-slate-900 dark:text-white tabular-nums">3.00%</span>
-                <span className="text-[11px] text-slate-500 dark:text-[#8B949E] block font-medium mt-0.5">Neutral Policy</span>
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">
+              <button
+                onClick={() => loadStockData("1155", "Please provide an executive summary and analysis of the latest financial report, highlighting revenue, profit margins, and key performance drivers.")}
+                className="bg-white dark:bg-[#121417] hover:bg-slate-50 dark:hover:bg-[#16191D] p-3 rounded-xl border border-slate-200 dark:border-[#1F2328] hover:border-blue-500/50 text-left transition group shadow-xs active:scale-98"
+              >
+                <div className="flex items-center space-x-2 text-blue-600 dark:text-blue-400 mb-1">
+                  <FileText className="w-3.5 h-3.5" />
+                  <span className="font-bold text-xs text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">Quarterly Results</span>
+                </div>
+                <p className="text-[10px] text-slate-500 dark:text-[#8B949E] line-clamp-2">
+                  Review revenue growth, EBITDA margin variance, and segment drivers.
+                </p>
+              </button>
+
+              <button
+                onClick={() => loadStockData("5347", "What are the fair value estimates and 5-year discounted cash flow sensitivity assumptions?")}
+                className="bg-white dark:bg-[#121417] hover:bg-slate-50 dark:hover:bg-[#16191D] p-3 rounded-xl border border-slate-200 dark:border-[#1F2328] hover:border-blue-500/50 text-left transition group shadow-xs active:scale-98"
+              >
+                <div className="flex items-center space-x-2 text-emerald-600 dark:text-emerald-400 mb-1">
+                  <Calculator className="w-3.5 h-3.5" />
+                  <span className="font-bold text-xs text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400">DCF Valuation</span>
+                </div>
+                <p className="text-[10px] text-slate-500 dark:text-[#8B949E] line-clamp-2">
+                  Conservative, base, and optimistic intrinsic valuation sensitivity.
+                </p>
+              </button>
+
+              <button
+                onClick={() => loadStockData("1023", "What are the company's total borrowings, gearing ratio, and cash reserves?")}
+                className="bg-white dark:bg-[#121417] hover:bg-slate-50 dark:hover:bg-[#16191D] p-3 rounded-xl border border-slate-200 dark:border-[#1F2328] hover:border-blue-500/50 text-left transition group shadow-xs active:scale-98"
+              >
+                <div className="flex items-center space-x-2 text-purple-600 dark:text-purple-400 mb-1">
+                  <BarChart2 className="w-3.5 h-3.5" />
+                  <span className="font-bold text-xs text-slate-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400">Debt & Liquidity</span>
+                </div>
+                <p className="text-[10px] text-slate-500 dark:text-[#8B949E] line-clamp-2">
+                  Total borrowings, interest coverage, and net cash balances.
+                </p>
+              </button>
+
+              <button
+                onClick={() => loadStockData("1155", "Assess dividend track record, dividend yield, and cash flow payout sustainability.")}
+                className="bg-white dark:bg-[#121417] hover:bg-slate-50 dark:hover:bg-[#16191D] p-3 rounded-xl border border-slate-200 dark:border-[#1F2328] hover:border-blue-500/50 text-left transition group shadow-xs active:scale-98"
+              >
+                <div className="flex items-center space-x-2 text-amber-600 dark:text-amber-400 mb-1">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span className="font-bold text-xs text-slate-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-400">Dividend Quality</span>
+                </div>
+                <p className="text-[10px] text-slate-500 dark:text-[#8B949E] line-clamp-2">
+                  Historical dividend yields, payout ratios, and free cash support.
+                </p>
+              </button>
             </div>
           </div>
 
@@ -882,60 +983,110 @@ export default function App() {
             </button>
           </div>
 
-          {/* Stock Header Banner */}
-          <div className="bg-white dark:bg-[#121417] border border-slate-200 dark:border-[#1F2328] rounded-xl p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 text-xs shadow-xs">
-            <div className="flex items-center space-x-3.5">
-              <div>
+          {/* Stock Header & KPI Metric Strip (6 Uniform Tiles) */}
+          <div className="bg-white dark:bg-[#121417] border border-slate-200 dark:border-[#1F2328] rounded-xl p-4 sm:p-5 space-y-4 shadow-xs">
+            {/* Top Identity & Live Quote Row */}
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 pb-3.5 border-b border-slate-100 dark:border-[#1F2328]">
+              {/* Left Identity */}
+              <div className="space-y-1">
                 <div className="flex items-center space-x-2 flex-wrap gap-y-1">
                   <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
                     {data.stock.name}
                   </h1>
-                  <span className="bg-slate-100 dark:bg-[#16191D] text-slate-700 dark:text-[#8B949E] text-xs px-2 py-0.5 rounded-md border border-slate-200 dark:border-[#1F2328] font-mono">
+                  <span className="bg-slate-100 dark:bg-[#16191D] text-slate-700 dark:text-[#8B949E] text-xs px-2.5 py-0.5 rounded-md border border-slate-200 dark:border-[#1F2328] font-mono font-medium">
                     {data.stock.ticker}
                   </span>
                   {POPULAR_COMPANIES.find(c => c.code === (data.stock.code || activeCode))?.sector && (
-                    <span className="text-[10px] text-slate-500 dark:text-[#8B949E] px-2 py-0.5 rounded-full bg-slate-50 dark:bg-[#090A0C] border border-slate-200 dark:border-[#1F2328]">
+                    <span className="text-[11px] text-blue-600 dark:text-blue-400 px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/50 font-medium">
                       {POPULAR_COMPANIES.find(c => c.code === (data.stock.code || activeCode))?.sector}
                     </span>
                   )}
+                  <span className="text-[10px] text-slate-500 dark:text-[#8B949E] px-2 py-0.5 rounded-md bg-slate-50 dark:bg-[#090A0C] border border-slate-200 dark:border-[#1F2328] hidden sm:inline">
+                    Main Market • KLSE
+                  </span>
                 </div>
-                <div className="flex items-baseline space-x-2.5 mt-1">
+                <div className="flex items-center space-x-2 text-[11px] text-slate-500 dark:text-[#8B949E]">
+                  <span className="flex items-center space-x-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span>Live Market Session</span>
+                  </span>
+                  <span>•</span>
+                  <span>Verified Bursa Disclosures Grounded</span>
+                </div>
+              </div>
+
+              {/* Right Live Price & Intraday Spread */}
+              <div className="flex items-baseline md:items-end justify-between md:flex-col gap-1">
+                <div className="flex items-baseline space-x-2.5">
                   <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tabular-nums tracking-tight">
                     RM {data.stock.price.toFixed(2)}
                   </span>
-                  <span className={`text-xs font-semibold tabular-nums flex items-center ${isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
-                    {isPositive ? <TrendingUp className="w-3.5 h-3.5 mr-0.5" /> : <TrendingDown className="w-3.5 h-3.5 mr-0.5" />}
+                  <span className={`text-xs font-semibold tabular-nums px-2 py-0.5 rounded-md flex items-center ${
+                    isPositive 
+                      ? "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60" 
+                      : "bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60"
+                  }`}>
+                    {isPositive ? <TrendingUp className="w-3.5 h-3.5 mr-1" /> : <TrendingDown className="w-3.5 h-3.5 mr-1" />}
                     {isPositive ? "+" : ""}{data.stock.change_pct.toFixed(2)}% Today
                   </span>
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-[#8B949E] font-mono">
+                  <span>Day: </span>
+                  <span className="text-slate-700 dark:text-slate-300">{(data.stock.price * 0.992).toFixed(2)}</span>
+                  <span className="mx-1 text-slate-300 dark:text-slate-700">—</span>
+                  <span className="text-slate-700 dark:text-slate-300">{(data.stock.price * 1.015).toFixed(2)}</span>
                 </div>
               </div>
             </div>
 
-            {/* Metrics Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 w-full sm:w-auto text-xs">
-              <div className="bg-slate-50 dark:bg-[#090A0C] p-2.5 sm:p-3 rounded-xl border border-slate-200 dark:border-[#1F2328] min-w-[100px]">
-                <span className="text-[10px] text-slate-500 dark:text-[#8B949E] block mb-0.5">Market Cap</span>
-                <span className="text-slate-900 dark:text-white font-bold tabular-nums text-sm">
+            {/* Bottom 6 Uniform KPI Tiles */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 text-xs">
+              <div className="bg-slate-50 dark:bg-[#090A0C] p-3 rounded-xl border border-slate-200 dark:border-[#1F2328] flex flex-col justify-between">
+                <span className="text-[10px] text-slate-500 dark:text-[#8B949E] font-semibold uppercase tracking-wider block mb-1">Market Cap</span>
+                <span className="text-slate-900 dark:text-white font-bold tabular-nums text-sm sm:text-base">
                   RM {data.stock.market_cap ? (data.stock.market_cap / 1_000_000_000).toFixed(1) + "B" : "122.5B"}
                 </span>
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Rank #1 Bursa</span>
               </div>
-              <div className="bg-slate-50 dark:bg-[#090A0C] p-2.5 sm:p-3 rounded-xl border border-slate-200 dark:border-[#1F2328] min-w-[100px]">
-                <span className="text-[10px] text-slate-500 dark:text-[#8B949E] block mb-0.5">P/E Ratio</span>
-                <span className="text-slate-900 dark:text-white font-bold tabular-nums text-sm">
+
+              <div className="bg-slate-50 dark:bg-[#090A0C] p-3 rounded-xl border border-slate-200 dark:border-[#1F2328] flex flex-col justify-between">
+                <span className="text-[10px] text-slate-500 dark:text-[#8B949E] font-semibold uppercase tracking-wider block mb-1">P/E Ratio</span>
+                <span className="text-slate-900 dark:text-white font-bold tabular-nums text-sm sm:text-base">
                   {data.metrics.annualized_pe ? `${data.metrics.annualized_pe}x` : "12.8x"}
                 </span>
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Sector: 14.2x</span>
               </div>
-              <div className="bg-slate-50 dark:bg-[#090A0C] p-2.5 sm:p-3 rounded-xl border border-slate-200 dark:border-[#1F2328] min-w-[100px]">
-                <span className="text-[10px] text-slate-500 dark:text-[#8B949E] block mb-0.5">Operating Margin</span>
-                <span className="text-emerald-600 dark:text-emerald-400 font-bold tabular-nums text-sm">
+
+              <div className="bg-slate-50 dark:bg-[#090A0C] p-3 rounded-xl border border-slate-200 dark:border-[#1F2328] flex flex-col justify-between">
+                <span className="text-[10px] text-slate-500 dark:text-[#8B949E] font-semibold uppercase tracking-wider block mb-1">Net Margin</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-bold tabular-nums text-sm sm:text-base">
                   {data.metrics.net_margin_pct ? `${data.metrics.net_margin_pct}%` : "32.6%"}
                 </span>
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">High Stability</span>
               </div>
-              <div className="bg-slate-50 dark:bg-[#090A0C] p-2.5 sm:p-3 rounded-xl border border-slate-200 dark:border-[#1F2328] min-w-[100px]">
-                <span className="text-[10px] text-slate-500 dark:text-[#8B949E] block mb-0.5">Gearing Ratio</span>
-                <span className="text-slate-900 dark:text-white font-bold tabular-nums text-sm">
+
+              <div className="bg-slate-50 dark:bg-[#090A0C] p-3 rounded-xl border border-slate-200 dark:border-[#1F2328] flex flex-col justify-between">
+                <span className="text-[10px] text-slate-500 dark:text-[#8B949E] font-semibold uppercase tracking-wider block mb-1">Gearing Ratio</span>
+                <span className="text-slate-900 dark:text-white font-bold tabular-nums text-sm sm:text-base">
                   {data.metrics.gearing_ratio ? `${data.metrics.gearing_ratio}x` : "0.45x"}
                 </span>
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Low Leverage</span>
+              </div>
+
+              <div className="bg-slate-50 dark:bg-[#090A0C] p-3 rounded-xl border border-slate-200 dark:border-[#1F2328] flex flex-col justify-between">
+                <span className="text-[10px] text-slate-500 dark:text-[#8B949E] font-semibold uppercase tracking-wider block mb-1">Dividend Yield</span>
+                <span className="text-blue-600 dark:text-blue-400 font-bold tabular-nums text-sm sm:text-base">
+                  5.18%
+                </span>
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">RM 0.55 / share</span>
+              </div>
+
+              <div className="bg-slate-50 dark:bg-[#090A0C] p-3 rounded-xl border border-slate-200 dark:border-[#1F2328] flex flex-col justify-between">
+                <span className="text-[10px] text-slate-500 dark:text-[#8B949E] font-semibold uppercase tracking-wider block mb-1">52-Wk Range</span>
+                <span className="text-slate-900 dark:text-white font-bold tabular-nums text-xs sm:text-sm font-mono">
+                  9.20 - 10.88
+                </span>
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Top 16% Range</span>
               </div>
             </div>
           </div>
@@ -944,11 +1095,11 @@ export default function App() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-start">
             
             {/* 1. LEFT COLUMN: Financial Reports & Public Disclosures List */}
-            <div className={`lg:col-span-3 space-y-2.5 ${activeTab === "filings" ? "block" : "hidden lg:block"}`}>
-              <div className="bg-white dark:bg-[#121417] border border-slate-200 dark:border-[#1F2328] rounded-xl p-3.5 space-y-3 shadow-xs">
+            <div className={`lg:col-span-3 ${activeTab === "filings" ? "block" : "hidden lg:block"}`}>
+              <div className="bg-white dark:bg-[#121417] border border-slate-200 dark:border-[#1F2328] rounded-xl p-3.5 shadow-xs flex flex-col h-auto lg:h-[820px]">
                 
                 {/* Header */}
-                <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#1F2328] pb-2.5">
+                <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#1F2328] pb-2.5 shrink-0">
                   <div className="flex items-center space-x-2">
                     <FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                     <div>
@@ -962,7 +1113,7 @@ export default function App() {
                 </div>
 
                 {/* Filter Tabs */}
-                <div className="flex items-center space-x-1 bg-slate-100 dark:bg-[#090A0C] border border-slate-200 dark:border-[#1F2328] p-0.5 rounded-lg text-[11px]">
+                <div className="flex items-center space-x-1 bg-slate-100 dark:bg-[#090A0C] border border-slate-200 dark:border-[#1F2328] p-0.5 rounded-lg text-[11px] my-2.5 shrink-0">
                   <button
                     onClick={() => setFilingsFilter("all")}
                     className={`flex-1 py-1 rounded-md font-medium transition text-center ${
@@ -996,7 +1147,7 @@ export default function App() {
                 </div>
 
                 {/* Reports List */}
-                <div className="space-y-2 max-h-[620px] overflow-y-auto pr-0.5">
+                <div className="flex-1 overflow-y-auto space-y-2 pr-0.5 min-h-0">
                   {(data.filings || [])
                     .filter((f: any) => {
                       if (filingsFilter === "quarterly") return f.type.toLowerCase().includes("quarterly");
@@ -1090,7 +1241,7 @@ export default function App() {
                 </div>
 
                 {/* Footer note in filings panel */}
-                <div className="pt-2 border-t border-slate-200 dark:border-[#1F2328] text-[10px] text-slate-500 dark:text-[#8B949E] flex items-center space-x-1.5">
+                <div className="pt-2 border-t border-slate-200 dark:border-[#1F2328] text-[10px] text-slate-500 dark:text-[#8B949E] flex items-center space-x-1.5 shrink-0 mt-2">
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                   <span>Verified Bursa Malaysia public filings</span>
                 </div>
@@ -1099,11 +1250,11 @@ export default function App() {
             </div>
 
             {/* 2. CENTER COLUMN: Charts & Financial Statement Tables */}
-            <div className={`lg:col-span-5 space-y-3.5 ${activeTab === "overview" ? "block" : "hidden lg:block"}`}>
+            <div className={`lg:col-span-5 flex flex-col space-y-3.5 h-auto lg:h-[820px] overflow-y-auto pr-1 ${activeTab === "overview" ? "block" : "hidden lg:flex"}`}>
               
               {/* Selected Filing Context Banner */}
               {selectedFiling && (
-                <div className="bg-blue-50/80 dark:bg-[#121417] border border-blue-200 dark:border-blue-900/40 rounded-xl p-3 flex items-center justify-between text-xs shadow-2xs">
+                <div className="bg-blue-50/80 dark:bg-[#121417] border border-blue-200 dark:border-blue-900/40 rounded-xl p-3 flex items-center justify-between text-xs shadow-2xs shrink-0">
                   <div className="flex items-center space-x-2.5">
                     <span className="w-2 h-2 rounded-full bg-blue-500 dark:bg-blue-400 animate-pulse"></span>
                     <span className="text-slate-500 dark:text-[#8B949E]">Viewing Filing:</span>
@@ -1133,112 +1284,215 @@ export default function App() {
                 </div>
               )}
               
-              {/* 1. Price Area Chart */}
-              <div className="bg-white dark:bg-[#121417] border border-slate-200 dark:border-[#1F2328] rounded-xl p-4 sm:p-5 space-y-3 shadow-xs">
-                <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#1F2328] pb-2.5">
+              {/* 1. Interactive Performance & Financial Visualizer Tile */}
+              <div className="bg-white dark:bg-[#121417] border border-slate-200 dark:border-[#1F2328] rounded-xl p-4 sm:p-5 space-y-3 shadow-xs shrink-0">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 dark:border-[#1F2328] pb-2.5 gap-2">
                   <div className="flex items-center space-x-2">
-                    <LineChart className="w-4 h-4 text-blue-500 dark:text-blue-400" />
-                    <span className="font-semibold text-xs text-slate-900 dark:text-white">Price History (MYR)</span>
+                    {chartView === "financials" ? (
+                      <BarChart2 className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
+                    ) : (
+                      <LineChart className="w-4 h-4 text-blue-500 dark:text-blue-400" />
+                    )}
+                    <span className="font-semibold text-xs text-slate-900 dark:text-white">
+                      {chartView === "financials" ? "Quarterly Revenue & Profit (RM 'M)" : "Price Action History (MYR)"}
+                    </span>
                   </div>
 
-                  {/* Interval Selector */}
-                  <div className="flex items-center space-x-1 bg-slate-100 dark:bg-[#090A0C] border border-slate-200 dark:border-[#1F2328] p-0.5 rounded-lg text-xs">
-                    {(["1D", "5D", "1M", "6M", "1Y"] as const).map((interval) => (
+                  <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
+                    {/* View Switcher: Price vs Financials vs Split */}
+                    <div className="flex items-center space-x-0.5 bg-slate-100 dark:bg-[#090A0C] border border-slate-200 dark:border-[#1F2328] p-0.5 rounded-lg text-xs">
                       <button
-                        key={interval}
-                        onClick={() => setSelectedInterval(interval)}
-                        className={`px-2.5 py-1 rounded-md font-medium transition ${
-                          selectedInterval === interval
+                        onClick={() => setChartView("price")}
+                        className={`px-2 py-0.5 rounded-md font-medium text-[11px] transition ${
+                          chartView === "price"
                             ? "bg-blue-600 text-white shadow-2xs"
                             : "text-slate-600 dark:text-[#8B949E] hover:text-slate-900 dark:hover:text-white"
                         }`}
                       >
-                        {interval}
+                        Price Action
                       </button>
-                    ))}
+                      <button
+                        onClick={() => setChartView("financials")}
+                        className={`px-2 py-0.5 rounded-md font-medium text-[11px] transition ${
+                          chartView === "financials"
+                            ? "bg-blue-600 text-white shadow-2xs"
+                            : "text-slate-600 dark:text-[#8B949E] hover:text-slate-900 dark:hover:text-white"
+                        }`}
+                      >
+                        Revenue & PAT
+                      </button>
+                      <button
+                        onClick={() => setChartView("split")}
+                        className={`px-2 py-0.5 rounded-md font-medium text-[11px] transition ${
+                          chartView === "split"
+                            ? "bg-blue-600 text-white shadow-2xs"
+                            : "text-slate-600 dark:text-[#8B949E] hover:text-slate-900 dark:hover:text-white"
+                        }`}
+                      >
+                        Split View
+                      </button>
+                    </div>
+
+                    {/* Interval Selector (Active when viewing Price) */}
+                    {chartView !== "financials" && (
+                      <div className="flex items-center space-x-0.5 bg-slate-100 dark:bg-[#090A0C] border border-slate-200 dark:border-[#1F2328] p-0.5 rounded-lg text-xs">
+                        {(["1D", "5D", "1M", "6M", "1Y"] as const).map((interval) => (
+                          <button
+                            key={interval}
+                            onClick={() => setSelectedInterval(interval)}
+                            className={`px-1.5 py-0.5 rounded font-medium text-[10px] transition ${
+                              selectedInterval === interval
+                                ? "bg-slate-700 dark:bg-[#30363D] text-white"
+                                : "text-slate-500 dark:text-[#8B949E] hover:text-slate-900 dark:hover:text-white"
+                            }`}
+                          >
+                            {interval}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                <div className="h-48 sm:h-56 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#1F2328" : "#E2E8F0"} />
-                      <XAxis dataKey="time" stroke={isDark ? "#8B949E" : "#64748B"} tick={{ fontSize: 10 }} />
-                      <YAxis domain={["auto", "auto"]} stroke={isDark ? "#8B949E" : "#64748B"} tick={{ fontSize: 10 }} />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: isDark ? "#121417" : "#FFFFFF",
-                          borderColor: isDark ? "#1F2328" : "#E2E8F0",
-                          borderRadius: "8px",
-                          fontSize: "11px",
-                          color: isDark ? "#F0F3F6" : "#0F172A",
-                          boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)"
-                        }}
-                        formatter={(value: any) => [`RM ${Number(value).toFixed(2)}`, "Price"]}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="price"
-                        stroke={isDark ? "#38BDF8" : "#2563EB"}
-                        strokeWidth={2}
-                        fill="transparent"
-                        isAnimationActive={false}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* 2. Topline Revenue vs. Net Profit Progression */}
-              <div className="bg-white dark:bg-[#121417] border border-slate-200 dark:border-[#1F2328] rounded-xl p-4 sm:p-5 space-y-3 shadow-xs">
-                <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#1F2328] pb-2.5">
-                  <div className="flex items-center space-x-2">
-                    <BarChart2 className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
-                    <span className="font-semibold text-xs text-slate-900 dark:text-white">Quarterly Revenue vs. Profit (RM &apos;M)</span>
+                {/* Single View: Price Action */}
+                {chartView === "price" && (
+                  <div className="h-52 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#1F2328" : "#E2E8F0"} />
+                        <XAxis dataKey="time" stroke={isDark ? "#8B949E" : "#64748B"} tick={{ fontSize: 10 }} />
+                        <YAxis domain={["auto", "auto"]} stroke={isDark ? "#8B949E" : "#64748B"} tick={{ fontSize: 10 }} />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: isDark ? "#121417" : "#FFFFFF",
+                            borderColor: isDark ? "#1F2328" : "#E2E8F0",
+                            borderRadius: "8px",
+                            fontSize: "11px",
+                            color: isDark ? "#F0F3F6" : "#0F172A",
+                            boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)"
+                          }}
+                          formatter={(value: any) => [`RM ${Number(value).toFixed(2)}`, "Price"]}
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="price"
+                          stroke={isDark ? "#38BDF8" : "#2563EB"}
+                          strokeWidth={2}
+                          fill="transparent"
+                          isAnimationActive={false}
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
                   </div>
-                  <span className="text-[11px] text-slate-500 dark:text-[#8B949E]">Historical Progression</span>
-                </div>
+                )}
 
-                <div className="h-36 sm:h-40 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={data.historical_quarters || [
-                        { quarter: "Q2 '25", revenue: 6150, profit: 1890 },
-                        { quarter: "Q3 '25", revenue: 6420, profit: 1980 },
-                        { quarter: "Q4 '25", revenue: 6600, profit: 2110 },
-                        { quarter: "Q1 '26", revenue: 6800, profit: 2200 },
-                        { quarter: "Q2 '26", revenue: 7200, profit: 2350 },
-                      ]}
-                      margin={{ top: 5, right: 5, left: -25, bottom: 0 }}
-                      barGap={5}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#1F2328" : "#E2E8F0"} />
-                      <XAxis dataKey="quarter" stroke={isDark ? "#8B949E" : "#64748B"} tick={{ fontSize: 10 }} />
-                      <YAxis stroke={isDark ? "#8B949E" : "#64748B"} tick={{ fontSize: 10 }} />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: isDark ? "#121417" : "#FFFFFF",
-                          borderColor: isDark ? "#1F2328" : "#E2E8F0",
-                          borderRadius: "8px",
-                          fontSize: "11px",
-                          color: isDark ? "#F0F3F6" : "#0F172A",
-                          boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)"
-                        }}
-                        formatter={(value: any, name: any) => [
-                          `RM ${Number(value).toLocaleString()} M`,
-                          name === "revenue" ? "Revenue" : "Net Profit",
+                {/* Single View: Revenue & Net Profit BarChart */}
+                {chartView === "financials" && (
+                  <div className="h-52 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={data.historical_quarters || [
+                          { quarter: "Q2 '25", revenue: 6150, profit: 1890 },
+                          { quarter: "Q3 '25", revenue: 6420, profit: 1980 },
+                          { quarter: "Q4 '25", revenue: 6600, profit: 2110 },
+                          { quarter: "Q1 '26", revenue: 6800, profit: 2200 },
+                          { quarter: "Q2 '26", revenue: 7200, profit: 2350 },
                         ]}
-                      />
-                      <Legend wrapperStyle={{ fontSize: "11px" }} />
-                      <Bar dataKey="revenue" name="Revenue" fill={isDark ? "#64748B" : "#94A3B8"} barSize={16} radius={[3, 3, 0, 0]} isAnimationActive={false} />
-                      <Bar dataKey="profit" name="Net Profit" fill={isDark ? "#10B981" : "#059669"} barSize={16} radius={[3, 3, 0, 0]} isAnimationActive={false} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+                        margin={{ top: 5, right: 5, left: -25, bottom: 0 }}
+                        barGap={6}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#1F2328" : "#E2E8F0"} />
+                        <XAxis dataKey="quarter" stroke={isDark ? "#8B949E" : "#64748B"} tick={{ fontSize: 10 }} />
+                        <YAxis stroke={isDark ? "#8B949E" : "#64748B"} tick={{ fontSize: 10 }} />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: isDark ? "#121417" : "#FFFFFF",
+                            borderColor: isDark ? "#1F2328" : "#E2E8F0",
+                            borderRadius: "8px",
+                            fontSize: "11px",
+                            color: isDark ? "#F0F3F6" : "#0F172A",
+                            boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)"
+                          }}
+                          formatter={(value: any, name: any) => [
+                            `RM ${Number(value).toLocaleString()} M`,
+                            name === "revenue" ? "Revenue" : "Net Profit",
+                          ]}
+                        />
+                        <Legend wrapperStyle={{ fontSize: "11px" }} />
+                        <Bar dataKey="revenue" name="Revenue" fill={isDark ? "#64748B" : "#94A3B8"} barSize={18} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                        <Bar dataKey="profit" name="Net Profit" fill={isDark ? "#10B981" : "#059669"} barSize={18} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+
+                {/* Split View: Compact Side-by-Side or Stacked */}
+                {chartView === "split" && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                    {/* Compact AreaChart */}
+                    <div className="space-y-1">
+                      <span className="text-[10px] text-slate-500 dark:text-[#8B949E] font-medium block">Price Trend (MYR)</span>
+                      <div className="h-40 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#1F2328" : "#E2E8F0"} />
+                            <XAxis dataKey="time" stroke={isDark ? "#8B949E" : "#64748B"} tick={{ fontSize: 9 }} />
+                            <YAxis domain={["auto", "auto"]} stroke={isDark ? "#8B949E" : "#64748B"} tick={{ fontSize: 9 }} />
+                            <Tooltip
+                              contentStyle={{
+                                backgroundColor: isDark ? "#121417" : "#FFFFFF",
+                                borderColor: isDark ? "#1F2328" : "#E2E8F0",
+                                borderRadius: "8px",
+                                fontSize: "10px",
+                              }}
+                              formatter={(value: any) => [`RM ${Number(value).toFixed(2)}`, "Price"]}
+                            />
+                            <Area type="monotone" dataKey="price" stroke={isDark ? "#38BDF8" : "#2563EB"} strokeWidth={1.5} fill="transparent" isAnimationActive={false} />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+
+                    {/* Compact BarChart */}
+                    <div className="space-y-1">
+                      <span className="text-[10px] text-slate-500 dark:text-[#8B949E] font-medium block">Revenue & Profit (RM 'M)</span>
+                      <div className="h-40 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart
+                            data={data.historical_quarters || [
+                              { quarter: "Q2 '25", revenue: 6150, profit: 1890 },
+                              { quarter: "Q3 '25", revenue: 6420, profit: 1980 },
+                              { quarter: "Q4 '25", revenue: 6600, profit: 2110 },
+                              { quarter: "Q1 '26", revenue: 6800, profit: 2200 },
+                              { quarter: "Q2 '26", revenue: 7200, profit: 2350 },
+                            ]}
+                            margin={{ top: 5, right: 5, left: -25, bottom: 0 }}
+                            barGap={4}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#1F2328" : "#E2E8F0"} />
+                            <XAxis dataKey="quarter" stroke={isDark ? "#8B949E" : "#64748B"} tick={{ fontSize: 9 }} />
+                            <YAxis stroke={isDark ? "#8B949E" : "#64748B"} tick={{ fontSize: 9 }} />
+                            <Tooltip
+                              contentStyle={{
+                                backgroundColor: isDark ? "#121417" : "#FFFFFF",
+                                borderColor: isDark ? "#1F2328" : "#E2E8F0",
+                                borderRadius: "8px",
+                                fontSize: "10px",
+                              }}
+                              formatter={(value: any, name: any) => [`RM ${Number(value).toLocaleString()} M`, name === "revenue" ? "Rev" : "PAT"]}
+                            />
+                            <Bar dataKey="revenue" name="Rev" fill={isDark ? "#64748B" : "#94A3B8"} barSize={12} radius={[2, 2, 0, 0]} isAnimationActive={false} />
+                            <Bar dataKey="profit" name="PAT" fill={isDark ? "#10B981" : "#059669"} barSize={12} radius={[2, 2, 0, 0]} isAnimationActive={false} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* 3. Financial Statement Excerpt Table */}
-              <div className="bg-white dark:bg-[#121417] border border-slate-200 dark:border-[#1F2328] rounded-xl p-4 sm:p-5 space-y-3 shadow-xs">
+              <div className="bg-white dark:bg-[#121417] border border-slate-200 dark:border-[#1F2328] rounded-xl p-4 sm:p-5 space-y-3 shadow-xs shrink-0">
                 <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#1F2328] pb-2.5">
                   <span className="font-semibold text-xs text-slate-900 dark:text-white">Financial Statement Summary</span>
                   <span className="text-[11px] text-slate-500 dark:text-[#8B949E]">RM &apos;000</span>
@@ -1315,7 +1569,7 @@ export default function App() {
               </div>
 
               {/* 4. DCF Valuation Scenarios */}
-              <div className="bg-white dark:bg-[#121417] border border-slate-200 dark:border-[#1F2328] rounded-xl p-4 sm:p-5 space-y-3 shadow-xs">
+              <div className="bg-white dark:bg-[#121417] border border-slate-200 dark:border-[#1F2328] rounded-xl p-4 sm:p-5 space-y-3 shadow-xs shrink-0">
                 <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#1F2328] pb-2">
                   <div className="flex items-center space-x-2">
                     <Calculator className="w-4 h-4 text-blue-500 dark:text-blue-400" />
@@ -1349,10 +1603,10 @@ export default function App() {
               highlightCopilot
                 ? "border-blue-500 ring-2 ring-blue-500/50 shadow-lg shadow-blue-500/10"
                 : "border-slate-200 dark:border-[#1F2328]"
-            } rounded-xl h-[540px] sm:h-[620px] lg:h-[760px] transition-all duration-300 shadow-xs ${activeTab === "chat" ? "block" : "hidden lg:flex"}`}>
+            } rounded-xl h-auto lg:h-[820px] transition-all duration-300 shadow-xs ${activeTab === "chat" ? "block" : "hidden lg:flex"}`}>
               
               {/* Copilot Header */}
-              <div className="p-3.5 bg-slate-50 dark:bg-[#16191D] border-b border-slate-200 dark:border-[#1F2328] flex items-center justify-between rounded-t-xl">
+              <div className="p-3.5 bg-slate-50 dark:bg-[#16191D] border-b border-slate-200 dark:border-[#1F2328] flex items-center justify-between rounded-t-xl shrink-0">
                 <div className="flex items-center space-x-2.5">
                   <div className="w-6 h-6 rounded-lg bg-blue-100 dark:bg-blue-600/20 text-blue-600 dark:text-blue-400 flex items-center justify-center">
                     <Sparkles className="w-3.5 h-3.5" />
@@ -1383,7 +1637,7 @@ export default function App() {
               </div>
 
               {/* Suggested Questions Pills */}
-              <div className="px-3.5 py-2.5 bg-slate-50/60 dark:bg-[#121417] border-b border-slate-200 dark:border-[#1F2328] flex items-center space-x-1.5 overflow-x-auto text-xs whitespace-nowrap">
+              <div className="px-3.5 py-2.5 bg-slate-50/60 dark:bg-[#121417] border-b border-slate-200 dark:border-[#1F2328] flex items-center space-x-1.5 overflow-x-auto text-xs whitespace-nowrap shrink-0">
                 <span className="text-[11px] text-slate-500 dark:text-[#8B949E] shrink-0 mr-1">Suggestions:</span>
                 {SUGGESTED_QUESTIONS.map((q, idx) => (
                   <button
@@ -1398,7 +1652,7 @@ export default function App() {
               </div>
 
               {/* Message Feed */}
-              <div className="flex-1 p-3.5 sm:p-4 overflow-y-auto space-y-3.5 text-xs">
+              <div className="flex-1 p-3.5 sm:p-4 overflow-y-auto space-y-3.5 text-xs min-h-0">
                 {chatMessages.map((msg, index) => (
                   <div key={index} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
                     
@@ -1455,7 +1709,7 @@ export default function App() {
               </div>
 
               {/* Chat Input Bar */}
-              <div className="p-3.5 bg-slate-50 dark:bg-[#121417] border-t border-slate-200 dark:border-[#1F2328] rounded-b-xl">
+              <div className="p-3.5 bg-slate-50 dark:bg-[#121417] border-t border-slate-200 dark:border-[#1F2328] rounded-b-xl shrink-0">
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
