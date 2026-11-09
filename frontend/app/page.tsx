@@ -200,6 +200,7 @@ export default function App() {
   // Selected Financial Filing for focused review
   const [selectedFiling, setSelectedFiling] = useState<any>(null);
   const [filingsFilter, setFilingsFilter] = useState<"all" | "quarterly" | "annual">("all");
+  const [highlightCopilot, setHighlightCopilot] = useState(false);
 
   // Ingestion Modal State
   const [ingestModalOpen, setIngestModalOpen] = useState(false);
@@ -297,7 +298,7 @@ export default function App() {
   }, [selectedInterval]);
 
   useEffect(() => {
-    chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    chatBottomRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [chatMessages, chatLoading]);
 
   // ON SUBMIT (Enter or button click): Trigger confirmation popup
@@ -334,12 +335,13 @@ export default function App() {
 
       if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
       const json = await res.json();
+      const replyContent = json.reply || json.response || "Analysis completed based on verified financial disclosures.";
 
       setChatMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content: json.reply,
+          content: replyContent,
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         },
       ]);
@@ -908,17 +910,27 @@ export default function App() {
                               <span>PAT: <strong className="text-emerald-400 font-mono">RM {f.profit_m?.toLocaleString()}M</strong></span>
                             </div>
                             <button
+                              disabled={chatLoading}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setSelectedFiling(f);
                                 setActiveTab("chat");
-                                handleSendMessage(`Please provide a detailed financial breakdown of the ${f.period} (${f.title}): highlight revenue drivers, operating margins, and disclosures.`);
+                                setHighlightCopilot(true);
+                                setTimeout(() => setHighlightCopilot(false), 2500);
+                                handleSendMessage(
+                                  `Please provide a detailed financial breakdown of the ${f.period} (${f.title}): highlight revenue drivers, operating margins, and disclosures.`,
+                                  data?.stock?.code || activeCode
+                                );
                               }}
-                              className="text-[10px] text-blue-400 hover:text-white bg-blue-950/40 hover:bg-blue-600 px-2 py-0.5 rounded border border-blue-900/50 hover:border-blue-500 transition font-medium flex items-center space-x-1"
+                              className="text-[10px] text-blue-400 hover:text-white bg-blue-950/40 hover:bg-blue-600 px-2 py-0.5 rounded border border-blue-900/50 hover:border-blue-500 transition font-medium flex items-center space-x-1 disabled:opacity-50"
                               title="Ask Copilot about this filing"
                             >
-                              <Sparkles className="w-3 h-3" />
-                              <span>Ask</span>
+                              {chatLoading && selectedFiling?.id === f.id ? (
+                                <RefreshCw className="w-3 h-3 animate-spin text-blue-400" />
+                              ) : (
+                                <Sparkles className="w-3 h-3" />
+                              )}
+                              <span>{chatLoading && selectedFiling?.id === f.id ? "Analyzing..." : "Ask"}</span>
                             </button>
                           </div>
                         </div>
@@ -948,14 +960,24 @@ export default function App() {
                     <span className="text-[#8B949E] hidden sm:inline truncate max-w-[180px]">({selectedFiling.title})</span>
                   </div>
                   <button
+                    disabled={chatLoading}
                     onClick={() => {
                       setActiveTab("chat");
-                      handleSendMessage(`Explain the quarter-over-quarter revenue and profit variance for ${selectedFiling.period}.`);
+                      setHighlightCopilot(true);
+                      setTimeout(() => setHighlightCopilot(false), 2500);
+                      handleSendMessage(
+                        `Explain the quarter-over-quarter revenue and profit variance for ${selectedFiling.period}.`,
+                        data?.stock?.code || activeCode
+                      );
                     }}
-                    className="text-[11px] text-blue-400 hover:text-white font-medium flex items-center space-x-1 shrink-0 ml-2"
+                    className="text-[11px] text-blue-400 hover:text-white font-medium flex items-center space-x-1 shrink-0 ml-2 disabled:opacity-50"
                   >
-                    <span>Analyze with Copilot</span>
-                    <ArrowRight className="w-3 h-3" />
+                    {chatLoading ? (
+                      <RefreshCw className="w-3 h-3 animate-spin text-blue-400" />
+                    ) : (
+                      <ArrowRight className="w-3 h-3" />
+                    )}
+                    <span>{chatLoading ? "Analyzing..." : "Analyze with Copilot"}</span>
                   </button>
                 </div>
               )}
@@ -1170,7 +1192,11 @@ export default function App() {
             </div>
 
             {/* 3. RIGHT COLUMN: AI Financial Research Copilot */}
-            <div className={`lg:col-span-4 flex flex-col bg-[#121417] border border-[#1F2328] rounded-lg h-[540px] sm:h-[620px] lg:h-[760px] ${activeTab === "chat" ? "block" : "hidden lg:flex"}`}>
+            <div className={`lg:col-span-4 flex flex-col bg-[#121417] border ${
+              highlightCopilot
+                ? "border-blue-500 ring-2 ring-blue-500/50 shadow-lg shadow-blue-500/10"
+                : "border-[#1F2328]"
+            } rounded-lg h-[540px] sm:h-[620px] lg:h-[760px] transition-all duration-300 ${activeTab === "chat" ? "block" : "hidden lg:flex"}`}>
               
               {/* Copilot Header */}
               <div className="p-3 bg-[#16191D] border-b border-[#1F2328] flex items-center justify-between">

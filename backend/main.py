@@ -437,8 +437,17 @@ def chat_with_analyst(req: ChatRequest):
         stock = resolve_bursa_stock_hybrid(req.stock_code)
         
         # Ensure company report is automatically pulled and ingested into 4-Stage RAG
-        AutomatedReportEngine.ensure_stock_report_ingested(
+        report_data, _ = AutomatedReportEngine.ensure_stock_report_ingested(
             stock["code"], stock["name"], stock["ticker"], rag_engine
+        )
+        financial_summary = (
+            f"Revenue: RM {report_data.revenue:,.0f} ('000), "
+            f"Net Profit: RM {report_data.net_profit:,.0f} ('000), "
+            f"Preceding Revenue: RM {report_data.prev_revenue:,.0f} ('000), "
+            f"Preceding Net Profit: RM {report_data.prev_net_profit:,.0f} ('000), "
+            f"Total Borrowings: RM {report_data.total_borrowings:,.0f} ('000), "
+            f"Cash: RM {report_data.cash:,.0f} ('000), "
+            f"Basic EPS: {report_data.eps_sen:.2f} sen"
         )
 
         # 1. Retrieve relevant notes via 4-Stage RAG (Hybrid RRF + FlashRank)
@@ -458,6 +467,9 @@ def chat_with_analyst(req: ChatRequest):
         prompt = f"""You are a Senior Equity Research Analyst for Bursa Malaysia on Bursa Intelligence (in the style of Yahoo Finance / Bloomberg Research).
 The user is asking questions about {stock['name']} ({stock['ticker']}, Bursa Code: {stock['code']}).
 
+OFFICIAL FINANCIAL METRICS:
+{financial_summary}
+
 VERIFIED QUARTERLY NOTES & DISCLOSURES:
 \"\"\"{context_snippets}\"\"\"
 
@@ -469,7 +481,7 @@ USER INQUIRY:
 
 GUIDELINES:
 1. Provide an authoritative, clear, and factual financial answer based on Bursa Malaysia filings.
-2. Cite specific notes (e.g. Note B1, Note B3, Note B5) whenever relevant.
+2. Cite specific notes (e.g. Note B1, Note B3, Note B5) and reference key figures whenever relevant.
 3. Keep the tone professional, objective, and analytical.
 4. Under CMSA 2007, do not give direct buy/sell investment recommendations or price targets.
 5. Format with clear headings and concise bullet points for quick reading.
@@ -501,6 +513,7 @@ GUIDELINES:
         
         return {
             "success": True,
+            "reply": guarded_response,
             "response": guarded_response,
             "cited_evidence": evidence
         }
