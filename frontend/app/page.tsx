@@ -13,7 +13,6 @@ import {
   X,
   FileText,
   Upload,
-  FileUp,
   Database,
   ArrowLeft,
   ChevronRight,
@@ -22,13 +21,9 @@ import {
   RefreshCw,
   CheckCircle2,
   AlertCircle,
-  HelpCircle,
-  ArrowUpRight,
-  ArrowDownRight,
+  Check,
   CornerDownLeft,
-  Building2,
-  Layers,
-  Check
+  ArrowRight
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import {
@@ -107,7 +102,7 @@ const SUGGESTED_QUESTIONS = [
   { label: "DCF Valuation", prompt: "What are the fair value estimates and key sensitivity assumptions under DCF?" }
 ];
 
-// Natural language query parser
+// Natural language query & ticker parser
 function parseQuery(query: string) {
   if (!query.trim()) return { company: null, instruction: "", raw: "" };
 
@@ -176,13 +171,16 @@ export default function App() {
   const [activeCode, setActiveCode] = useState<string>("1155");
   const [searchQuery, setSearchQuery] = useState("");
   const [data, setData] = useState<any>(null);
+  
+  // Loading interface states
   const [loading, setLoading] = useState(false);
+  const [loadingStep, setLoadingStep] = useState(1);
+  const [loadingStockName, setLoadingStockName] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  // User-friendly Start Page Assistant Popup
-  const [isInputFocused, setIsInputFocused] = useState(false);
+  // User-friendly Interactive Assistant Popup State
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const [parsedIntent, setParsedIntent] = useState<ReturnType<typeof parseQuery>>({ company: null, instruction: "", raw: "" });
-  const [assistantDismissed, setAssistantDismissed] = useState(false);
 
   // Time Interval & Charts
   const [selectedInterval, setSelectedInterval] = useState<string>("1D");
@@ -208,12 +206,12 @@ export default function App() {
   const [ingestLoading, setIngestLoading] = useState(false);
   const [ingestFeedback, setIngestFeedback] = useState<{ success: boolean; message: string; details?: any } | null>(null);
 
-  // Update intent on typing
+  // Real-time query intent recognition
   useEffect(() => {
     if (searchQuery.trim().length > 0) {
       const intent = parseQuery(searchQuery);
       setParsedIntent(intent);
-      setAssistantDismissed(false);
+      setAssistantOpen(true);
     } else {
       setParsedIntent({ company: null, instruction: "", raw: "" });
     }
@@ -221,8 +219,18 @@ export default function App() {
 
   const loadStockData = async (code: string, autoInstruction?: string) => {
     setLoading(true);
+    setLoadingStep(1);
     setError(null);
-    setIsInputFocused(false);
+    setAssistantOpen(false);
+
+    // Identify stock display name
+    const found = POPULAR_COMPANIES.find(c => c.code === code);
+    setLoadingStockName(found ? found.name : `Stock ${code}`);
+
+    // Simulate animated loading milestones for transparent feedback
+    const step2Timer = setTimeout(() => setLoadingStep(2), 500);
+    const step3Timer = setTimeout(() => setLoadingStep(3), 1100);
+    const step4Timer = setTimeout(() => setLoadingStep(4), 1800);
 
     try {
       const res = await fetch(`${API_BASE}/api/reports/analyze`, {
@@ -230,6 +238,7 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: code, stock_code: code }),
       });
+
       if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
       const json = await res.json();
       setData(json);
@@ -265,6 +274,9 @@ export default function App() {
     } catch (err: any) {
       setError(err.message || "Failed to load stock data");
     } finally {
+      clearTimeout(step2Timer);
+      clearTimeout(step3Timer);
+      clearTimeout(step4Timer);
       setLoading(false);
     }
   };
@@ -294,7 +306,7 @@ export default function App() {
 
     loadStockData(targetCode, instruction);
     setSearchQuery("");
-    setIsInputFocused(false);
+    setAssistantOpen(false);
   };
 
   const handleSendMessage = async (textToSend?: string, overrideCode?: string) => {
@@ -405,28 +417,22 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#090A0C] text-[#F0F3F6] flex flex-col font-sans">
       
-      {/* 1. Global Navigation Bar - Responsive on all screens */}
-      <header className="bg-[#121417] border-b border-[#1F2328] sticky top-0 z-40">
-        <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 py-2.5 flex items-center justify-between gap-3">
-          
-          {/* Logo & Platform Name */}
-          <div className="flex items-center space-x-2.5 cursor-pointer shrink-0" onClick={() => setView("home")}>
-            <div className="w-7 h-7 bg-blue-600 rounded flex items-center justify-center font-bold text-white text-xs shadow-sm">
-              BI
-            </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <span className="font-bold text-sm tracking-tight text-white">Bursa Intelligence</span>
-                <span className="text-[10px] bg-[#16191D] text-[#8B949E] px-1.5 py-0.5 rounded border border-[#1F2328] hidden sm:inline">
-                  Malaysia
-                </span>
-              </div>
-            </div>
-          </div>
+      {/* 1. Global Navigation Bar - Clean, Minimal Header (NO Logo & NO Upload Filing on Top) */}
+      {view === "terminal" && (
+        <header className="bg-[#121417] border-b border-[#1F2328] sticky top-0 z-40">
+          <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 py-2.5 flex items-center justify-between gap-3">
+            
+            {/* Back to Start Page */}
+            <button
+              onClick={() => setView("home")}
+              className="bg-[#16191D] hover:bg-[#1F2328] text-[#8B949E] hover:text-[#F0F3F6] px-3 py-1.5 rounded border border-[#1F2328] flex items-center space-x-1.5 transition text-xs font-medium"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Start Page</span>
+            </button>
 
-          {/* Search Bar in Terminal Mode */}
-          {view === "terminal" && (
-            <form onSubmit={handleSearchSubmit} className="flex-1 max-w-md hidden md:flex items-center">
+            {/* Quick Switch Stock Search Bar */}
+            <form onSubmit={handleSearchSubmit} className="flex-1 max-w-md flex items-center">
               <div className="relative w-full">
                 <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#8B949E]" />
                 <input
@@ -434,7 +440,7 @@ export default function App() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Switch stock (e.g. Tenaga, Maybank, CIMB, 5347)..."
-                  className="w-full bg-[#090A0C] border border-[#1F2328] rounded pl-8 pr-16 py-1.5 text-xs text-[#F0F3F6] placeholder:text-[#6E7681] focus:outline-none focus:border-[#38BDF8] transition"
+                  className="w-full bg-[#090A0C] border border-[#1F2328] rounded pl-8 pr-16 py-1.5 text-xs text-[#F0F3F6] placeholder:text-[#6E7681] focus:outline-none focus:border-blue-500 transition"
                 />
                 <button
                   type="submit"
@@ -445,70 +451,49 @@ export default function App() {
                 </button>
               </div>
             </form>
-          )}
 
-          {/* Action Buttons */}
-          <div className="flex items-center space-x-2 text-xs">
-            {view === "terminal" && (
-              <button
-                onClick={() => setView("home")}
-                className="bg-[#16191D] hover:bg-[#1F2328] text-[#8B949E] hover:text-[#F0F3F6] px-2.5 py-1.5 rounded border border-[#1F2328] flex items-center space-x-1.5 transition font-medium"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Start Page</span>
-              </button>
-            )}
-
-            <button
-              onClick={() => {
-                setIngestStockCode(data?.stock?.code || "1155");
-                setIngestModalOpen(true);
-              }}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded font-medium flex items-center space-x-1.5 transition"
-            >
-              <FileUp className="w-3.5 h-3.5" />
-              <span>Upload Filing</span>
-            </button>
+            {/* Subtle Right Indicator */}
+            <span className="text-[11px] text-[#8B949E] font-mono hidden sm:inline">
+              KLSE • CMSA 2007
+            </span>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
       {/* 2. VIEW 1: CLEAN, USER-FRIENDLY START PAGE */}
       {view === "home" && (
-        <main className="flex-1 w-full max-w-5xl mx-auto px-3 sm:px-6 py-6 sm:py-10 flex flex-col items-center justify-center space-y-6 sm:space-y-8">
+        <main className="flex-1 w-full max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-14 flex flex-col items-center justify-center space-y-7 sm:space-y-9">
           
           {/* Hero Welcome */}
-          <div className="text-center space-y-2 max-w-xl w-full">
-            <div className="inline-flex items-center space-x-1.5 bg-[#121417] border border-[#1F2328] px-2.5 py-1 text-xs text-[#8B949E] rounded-full">
+          <div className="text-center space-y-2.5 max-w-xl w-full">
+            <div className="inline-flex items-center space-x-1.5 bg-[#121417] border border-[#1F2328] px-3 py-1 text-xs text-[#8B949E] rounded-full">
               <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-              <span>Bursa Malaysia Financial Intelligence</span>
+              <span>Financial Report Intelligence</span>
             </div>
-            <h1 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
-              Research Any Bursa Company
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white tracking-tight">
+              Bursa Market Research
             </h1>
-            <p className="text-[#8B949E] text-xs sm:text-sm leading-relaxed">
-              Search by company name, ticker code, or ask an analytical question. The platform pulls quarterly financial statements and answers your questions using official filings.
+            <p className="text-[#8B949E] text-xs sm:text-sm leading-relaxed max-w-md mx-auto">
+              Search any company name or ticker code to automatically pull quarterly filings, review financial statements, and ask analytical questions.
             </p>
           </div>
 
           {/* Prominent Search Box */}
           <div className="w-full max-w-2xl relative">
             <form onSubmit={handleSearchSubmit} className="relative">
-              <div className="relative flex items-center">
+              <div className="relative flex items-center shadow-lg">
                 <Search className="w-4 h-4 sm:w-5 sm:h-5 absolute left-3.5 text-[#8B949E]" />
                 <input
                   type="text"
                   value={searchQuery}
-                  onFocus={() => {
-                    setIsInputFocused(true);
-                    setAssistantDismissed(false);
-                  }}
+                  onClick={() => setAssistantOpen(true)}
+                  onFocus={() => setAssistantOpen(true)}
                   onChange={(e) => {
                     setSearchQuery(e.target.value);
-                    setIsInputFocused(true);
+                    setAssistantOpen(true);
                   }}
                   placeholder="e.g. Tenaga, Maybank, or 'analyse financial report for Tenaga'..."
-                  className="w-full bg-[#121417] border border-[#1F2328] hover:border-[#30363D] focus:border-blue-500 rounded-lg pl-10 pr-24 py-3 sm:py-3.5 text-xs sm:text-sm text-white placeholder:text-[#6E7681] focus:outline-none transition shadow-sm"
+                  className="w-full bg-[#121417] border border-[#1F2328] hover:border-[#30363D] focus:border-blue-500 rounded-lg pl-10 pr-24 py-3 sm:py-3.5 text-xs sm:text-sm text-white placeholder:text-[#6E7681] focus:outline-none transition"
                   autoFocus
                 />
                 <button
@@ -516,29 +501,20 @@ export default function App() {
                   disabled={loading || !searchQuery.trim()}
                   className="absolute right-1.5 bg-blue-600 hover:bg-blue-500 text-white px-3.5 py-2 rounded text-xs font-semibold disabled:opacity-40 flex items-center space-x-1 transition"
                 >
-                  {loading ? (
-                    <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>Loading...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Analyze</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </>
-                  )}
+                  <span>Analyze</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             </form>
             <p className="text-[11px] text-[#8B949E] mt-2 text-center">
-              Try typing <span className="text-blue-400">&quot;analyse financial report for Tenaga&quot;</span> or click an equity below
+              Type <span className="text-blue-400 font-medium">&quot;analyse financial report for Tenaga&quot;</span> or select an equity below
             </p>
           </div>
 
           {/* Popular Malaysian Companies Grid */}
           <div className="w-full space-y-2.5">
             <div className="flex items-center justify-between border-b border-[#1F2328] pb-1.5">
-              <span className="text-xs font-semibold text-white">Popular Companies</span>
+              <span className="text-xs font-semibold text-white">Popular Equities</span>
               <span className="text-[11px] text-[#8B949E]">Bursa Malaysia</span>
             </div>
 
@@ -548,7 +524,7 @@ export default function App() {
                   key={company.code}
                   onClick={() => loadStockData(company.code)}
                   disabled={loading}
-                  className="bg-[#121417] hover:bg-[#16191D] p-3 rounded border border-[#1F2328] hover:border-[#30363D] text-left transition flex flex-col justify-between group active:scale-[0.99]"
+                  className="bg-[#121417] hover:bg-[#16191D] p-3 rounded border border-[#1F2328] hover:border-slate-700 text-left transition flex flex-col justify-between group active:scale-[0.99]"
                 >
                   <div className="flex items-center justify-between w-full mb-1">
                     <span className="text-xs font-bold text-white group-hover:text-blue-400">
@@ -603,38 +579,41 @@ export default function App() {
           </div>
 
           {/* ========================================================================= */}
-          {/* USER-FRIENDLY POPUP ASSISTANT CARD AT BOTTOM OF START PAGE                */}
-          {/* Confirms company intended + captures user instruction + offers suggestions */}
+          {/* USER-REQUESTED INTERACTIVE ASSISTANT POPUP AT BOTTOM OF START PAGE        */}
+          {/* Always appears when user clicks or inputs into the search space           */}
           {/* ========================================================================= */}
-          {(isInputFocused || searchQuery.trim().length > 0) && !assistantDismissed && (
-            <div className="fixed bottom-3 sm:bottom-5 left-1/2 -translate-x-1/2 w-[94%] max-w-lg z-50 bg-[#121417] border border-[#30363D] shadow-2xl rounded-lg p-3.5 text-xs animate-in fade-in slide-in-from-bottom-2 duration-150">
+          {assistantOpen && (
+            <div className="fixed bottom-3 sm:bottom-5 left-1/2 -translate-x-1/2 w-[94%] max-w-lg z-40 bg-[#12161f] border border-blue-500/40 shadow-2xl rounded-xl p-4 text-xs animate-in fade-in slide-in-from-bottom-3 duration-200">
               
               {/* Header */}
-              <div className="flex items-center justify-between border-b border-[#1F2328] pb-2 mb-2.5">
+              <div className="flex items-center justify-between border-b border-[#1F2328] pb-2.5 mb-3">
                 <div className="flex items-center space-x-2">
-                  <div className="w-5 h-5 rounded-full bg-blue-600/20 text-blue-400 flex items-center justify-center">
-                    <Sparkles className="w-3 h-3" />
+                  <div className="w-6 h-6 rounded-full bg-blue-600/20 text-blue-400 flex items-center justify-center">
+                    <Sparkles className="w-3.5 h-3.5" />
                   </div>
-                  <span className="font-bold text-white text-xs">Research Assistant</span>
+                  <div>
+                    <span className="font-bold text-white text-xs block">Research Assistant</span>
+                    <span className="text-[10px] text-[#8B949E]">Target company & instruction confirmation</span>
+                  </div>
                 </div>
                 <button
-                  onClick={() => setAssistantDismissed(true)}
-                  className="text-[#8B949E] hover:text-white p-1 rounded hover:bg-[#1F2328]"
-                  title="Close"
+                  onClick={() => setAssistantOpen(false)}
+                  className="text-[#8B949E] hover:text-white p-1 rounded hover:bg-[#1F2328] transition"
+                  title="Close Assistant"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <X className="w-4 h-4" />
                 </button>
               </div>
 
               {/* Case 1: Company Matched */}
               {parsedIntent.company ? (
-                <div className="space-y-2.5">
-                  <div className="bg-[#090A0C] border border-[#1F2328] p-2.5 rounded">
+                <div className="space-y-3">
+                  <div className="bg-[#090c14] border border-slate-800 p-3 rounded-lg">
                     <div className="flex items-center justify-between text-[11px] text-[#8B949E] mb-1">
-                      <span>Target Company:</span>
-                      <span className="text-emerald-400 font-medium flex items-center space-x-1">
+                      <span>Identified Company:</span>
+                      <span className="text-emerald-400 font-semibold flex items-center space-x-1">
                         <Check className="w-3 h-3" />
-                        <span>Identified</span>
+                        <span>Ready</span>
                       </span>
                     </div>
                     <div className="flex items-baseline justify-between">
@@ -647,9 +626,9 @@ export default function App() {
                     </div>
 
                     {parsedIntent.instruction ? (
-                      <div className="mt-2 pt-2 border-t border-[#1F2328] text-[11px]">
-                        <span className="text-[#8B949E] block mb-1">Your request will be answered automatically:</span>
-                        <div className="text-blue-300 bg-[#16191D] p-2 rounded border border-[#1F2328] font-medium">
+                      <div className="mt-2.5 pt-2 border-t border-slate-800 text-[11px]">
+                        <span className="text-[#8B949E] block mb-1">Instruction to execute in chatbot:</span>
+                        <div className="text-blue-300 bg-[#141b28] p-2 rounded border border-blue-900/40 font-medium">
                           &quot;{parsedIntent.instruction}&quot;
                         </div>
                       </div>
@@ -661,88 +640,78 @@ export default function App() {
                     onClick={() => {
                       const comp = parsedIntent.company!;
                       loadStockData(comp.code, parsedIntent.instruction);
-                      setAssistantDismissed(true);
                     }}
-                    disabled={loading}
-                    className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-3 rounded flex items-center justify-center space-x-1.5 transition text-xs shadow"
+                    className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 px-3 rounded-lg flex items-center justify-center space-x-2 transition text-xs shadow-md"
                   >
-                    {loading ? (
-                      <>
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        <span>Fetching Financial Reports...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>
-                          {parsedIntent.instruction ? `Confirm & Analyze ${parsedIntent.company.name}` : `View ${parsedIntent.company.name} Overview`}
-                        </span>
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </>
-                    )}
+                    <span>
+                      {parsedIntent.instruction ? `Confirm & Analyze ${parsedIntent.company.name}` : `View ${parsedIntent.company.name} Financials`}
+                    </span>
+                    <ArrowRight className="w-4 h-4" />
                   </button>
 
                   {/* Quick Suggested Queries */}
-                  <div className="pt-1.5 border-t border-[#1F2328]">
-                    <span className="text-[10px] text-[#8B949E] block mb-1.5">Or choose a common topic:</span>
+                  <div className="pt-2 border-t border-[#1F2328]">
+                    <span className="text-[10px] text-[#8B949E] block mb-1.5 font-medium">Or run a suggested analytical prompt:</span>
                     <div className="flex flex-wrap gap-1.5">
                       <button
                         onClick={() => {
                           const comp = parsedIntent.company!;
                           loadStockData(comp.code, "Summarize revenue drivers and segment performance from Note B1.");
-                          setAssistantDismissed(true);
                         }}
                         className="bg-[#16191D] hover:bg-[#1F2328] text-[#8B949E] hover:text-white text-[11px] px-2 py-1 rounded border border-[#1F2328] transition"
                       >
-                        Revenue & Margins
+                        Revenue & Margins (Note B1)
                       </button>
                       <button
                         onClick={() => {
                           const comp = parsedIntent.company!;
                           loadStockData(comp.code, "What are the management's key operating risks and market outlook in Note B3?");
-                          setAssistantDismissed(true);
                         }}
                         className="bg-[#16191D] hover:bg-[#1F2328] text-[#8B949E] hover:text-white text-[11px] px-2 py-1 rounded border border-[#1F2328] transition"
                       >
-                        Management Outlook
+                        Board Outlook (Note B3)
                       </button>
                       <button
                         onClick={() => {
                           const comp = parsedIntent.company!;
                           loadStockData(comp.code, "Summarize total borrowings, gearing ratio, and debt obligations.");
-                          setAssistantDismissed(true);
                         }}
                         className="bg-[#16191D] hover:bg-[#1F2328] text-[#8B949E] hover:text-white text-[11px] px-2 py-1 rounded border border-[#1F2328] transition"
                       >
-                        Debt & Cash Position
+                        Debt & Gearing
                       </button>
                     </div>
                   </div>
                 </div>
               ) : (
                 /* Case 2: No exact match yet */
-                <div className="space-y-2">
-                  <p className="text-[#8B949E] text-[11px]">
-                    Which Bursa Malaysia company would you like to research?
+                <div className="space-y-2.5">
+                  <p className="text-[#8B949E] text-xs">
+                    Please select a target company to analyze with your prompt:
                   </p>
-                  <div className="grid grid-cols-2 gap-1.5">
+                  <div className="grid grid-cols-2 gap-2">
                     {POPULAR_COMPANIES.slice(0, 4).map((c) => (
                       <button
                         key={c.code}
                         onClick={() => {
                           const instruction = searchQuery.trim();
                           loadStockData(c.code, instruction);
-                          setAssistantDismissed(true);
                         }}
-                        className="bg-[#090A0C] hover:bg-[#16191D] text-left p-2 border border-[#1F2328] hover:border-blue-500 rounded transition flex items-center justify-between"
+                        className="bg-[#090c14] hover:bg-[#16191D] text-left p-2.5 border border-slate-800 hover:border-blue-500 rounded-lg transition flex items-center justify-between"
                       >
                         <div>
                           <span className="font-bold text-white block text-xs">{c.name}</span>
                           <span className="text-[10px] text-[#8B949E]">{c.ticker}</span>
                         </div>
-                        <span className="text-[10px] text-blue-400 font-medium">Select →</span>
+                        <span className="text-xs text-blue-400 font-medium">Select →</span>
                       </button>
                     ))}
                   </div>
+                  {searchQuery.trim() && (
+                    <div className="text-[11px] text-[#8B949E] pt-2 border-t border-[#1F2328]">
+                      Your request: <span className="text-white font-medium">&quot;{searchQuery}&quot;</span> will run automatically once a company is selected.
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1060,21 +1029,34 @@ export default function App() {
                   </div>
                 </div>
 
-                <button
-                  onClick={() => {
-                    setChatMessages([
-                      {
-                        role: "assistant",
-                        content: `Chat history cleared. Active context is **${data.stock.name} (${data.stock.ticker})**. How can I help you today?`,
-                        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                      }
-                    ]);
-                  }}
-                  className="text-[11px] text-[#8B949E] hover:text-white px-2 py-1 rounded hover:bg-[#1F2328] border border-transparent hover:border-[#30363D] transition"
-                  title="Clear conversation"
-                >
-                  Clear Chat
-                </button>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => {
+                      setIngestStockCode(data.stock.code);
+                      setIngestModalOpen(true);
+                    }}
+                    className="text-[11px] text-[#8B949E] hover:text-white px-2 py-1 rounded hover:bg-[#1F2328] border border-transparent hover:border-[#30363D] transition flex items-center space-x-1"
+                    title="Upload custom filing"
+                  >
+                    <Upload className="w-3 h-3" />
+                    <span>Upload</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setChatMessages([
+                        {
+                          role: "assistant",
+                          content: `Chat history cleared. Active context is **${data.stock.name} (${data.stock.ticker})**. How can I help you today?`,
+                          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        }
+                      ]);
+                    }}
+                    className="text-[11px] text-[#8B949E] hover:text-white px-2 py-1 rounded hover:bg-[#1F2328] border border-transparent hover:border-[#30363D] transition"
+                    title="Clear conversation"
+                  >
+                    Clear
+                  </button>
+                </div>
               </div>
 
               {/* Suggested Questions Pills */}
@@ -1185,7 +1167,97 @@ export default function App() {
         </main>
       )}
 
-      {/* 4. Universal Document Ingestion Modal */}
+      {/* ========================================================================= */}
+      {/* 4. DEDICATED TRANSPARENT LOADING INTERFACE AFTER SUBMITTING PROMPT         */}
+      {/* Shows animated step-by-step progress while pulling & indexing filing      */}
+      {/* ========================================================================= */}
+      {loading && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#12161f] border border-slate-700/80 rounded-2xl max-w-md w-full p-6 text-center shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
+            
+            {/* Animated Loading Rings & Document Icon */}
+            <div className="relative w-16 h-16 mx-auto">
+              <div className="absolute inset-0 rounded-full border-2 border-blue-500/20 border-t-blue-500 animate-spin"></div>
+              <div className="absolute inset-2 rounded-full border-2 border-emerald-500/20 border-b-emerald-500 animate-spin [animation-duration:1.5s]"></div>
+              <div className="absolute inset-0 flex items-center justify-center text-blue-400">
+                <FileText className="w-6 h-6 animate-pulse" />
+              </div>
+            </div>
+
+            {/* Title & Subtitle */}
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-white">
+                Analyzing {loadingStockName || "Financial Filing"}...
+              </h3>
+              <p className="text-xs text-slate-400">
+                Retrieving regulatory disclosures & running 4-Stage Hierarchical RAG
+              </p>
+            </div>
+
+            {/* Multi-Step Ingestion Checklist */}
+            <div className="bg-[#090c14] border border-slate-800 rounded-xl p-3.5 text-left text-xs space-y-2.5 font-sans">
+              <div className="flex items-center space-x-2.5">
+                {loadingStep > 1 ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                ) : (
+                  <RefreshCw className="w-4 h-4 text-blue-400 animate-spin shrink-0" />
+                )}
+                <span className={loadingStep >= 1 ? "text-slate-200 font-medium" : "text-slate-500"}>
+                  1. Retrieving quarterly financial statements & balance sheets
+                </span>
+              </div>
+
+              <div className="flex items-center space-x-2.5">
+                {loadingStep > 2 ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                ) : loadingStep === 2 ? (
+                  <RefreshCw className="w-4 h-4 text-blue-400 animate-spin shrink-0" />
+                ) : (
+                  <div className="w-4 h-4 rounded-full border border-slate-700 shrink-0" />
+                )}
+                <span className={loadingStep >= 2 ? "text-slate-200 font-medium" : "text-slate-500"}>
+                  2. AST table extraction & section hierarchy indexing
+                </span>
+              </div>
+
+              <div className="flex items-center space-x-2.5">
+                {loadingStep > 3 ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                ) : loadingStep === 3 ? (
+                  <RefreshCw className="w-4 h-4 text-blue-400 animate-spin shrink-0" />
+                ) : (
+                  <div className="w-4 h-4 rounded-full border border-slate-700 shrink-0" />
+                )}
+                <span className={loadingStep >= 3 ? "text-slate-200 font-medium" : "text-slate-500"}>
+                  3. Indexing into Hybrid ChromaDB + BM25 RAG space
+                </span>
+              </div>
+
+              <div className="flex items-center space-x-2.5">
+                {loadingStep >= 4 ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                ) : (
+                  <div className="w-4 h-4 rounded-full border border-slate-700 shrink-0" />
+                )}
+                <span className={loadingStep >= 4 ? "text-emerald-400 font-medium" : "text-slate-500"}>
+                  4. Initializing AI Research Workspace & Copilot
+                </span>
+              </div>
+            </div>
+
+            {/* Smooth Animated Progress Bar */}
+            <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+              <div
+                className="bg-gradient-to-r from-blue-500 to-emerald-500 h-full transition-all duration-300"
+                style={{ width: `${Math.min(loadingStep * 25, 100)}%` }}
+              />
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* 5. Document Ingestion Modal */}
       {ingestModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-3">
           <div className="bg-[#121417] border border-[#1F2328] rounded-lg max-w-lg w-full p-4 sm:p-5 space-y-3.5 text-xs shadow-2xl">
@@ -1193,7 +1265,7 @@ export default function App() {
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-[#1F2328] pb-2.5">
               <div className="flex items-center space-x-2">
-                <FileUp className="w-4 h-4 text-emerald-400" />
+                <FileText className="w-4 h-4 text-emerald-400" />
                 <h3 className="font-bold text-sm text-white">Upload Financial Filing</h3>
               </div>
               <button
@@ -1342,7 +1414,7 @@ export default function App() {
         </div>
       )}
 
-      {/* 5. Clean Footer */}
+      {/* 6. Clean Footer */}
       <footer className="bg-[#121417] border-t border-[#1F2328] py-2.5 px-3 sm:px-6 text-xs text-[#8B949E]">
         <div className="w-full max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-1 text-[11px]">
           <p>© 2026 Bursa Intelligence. Financial data grounded in official Bursa Malaysia filings.</p>
