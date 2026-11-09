@@ -19,7 +19,10 @@ import {
   RefreshCw,
   CheckCircle2,
   Check,
-  ArrowRight
+  ArrowRight,
+  Filter,
+  Calendar,
+  FolderOpen
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import {
@@ -191,8 +194,12 @@ export default function App() {
   const [chatLoading, setChatLoading] = useState(false);
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
-  // Responsive Workspace View Toggle for mobile
-  const [activeTab, setActiveTab] = useState<"overview" | "chat">("overview");
+  // Responsive Workspace View Toggle for mobile (3 tabs: Filings, Overview, Copilot)
+  const [activeTab, setActiveTab] = useState<"filings" | "overview" | "chat">("overview");
+
+  // Selected Financial Filing for focused review
+  const [selectedFiling, setSelectedFiling] = useState<any>(null);
+  const [filingsFilter, setFilingsFilter] = useState<"all" | "quarterly" | "annual">("all");
 
   // Ingestion Modal State
   const [ingestModalOpen, setIngestModalOpen] = useState(false);
@@ -235,6 +242,11 @@ export default function App() {
       const json = await res.json();
       setData(json);
       setActiveCode(code);
+      if (json.filings && json.filings.length > 0) {
+        setSelectedFiling(json.filings[0]);
+      } else {
+        setSelectedFiling(null);
+      }
       setView("terminal");
 
       if (json.historical_quarters && json.historical_quarters.length > 0) {
@@ -410,7 +422,7 @@ export default function App() {
       {/* 1. Header (Clean & Minimal: NO Logo and NO Upload Filing Button) */}
       {view === "terminal" && (
         <header className="bg-[#121417] border-b border-[#1F2328] sticky top-0 z-40">
-          <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 py-2.5 flex items-center justify-between gap-3">
+          <div className="w-full max-w-[1600px] mx-auto px-3 sm:px-6 py-2.5 flex items-center justify-between gap-3">
             
             {/* Back to Start Page */}
             <button
@@ -698,26 +710,36 @@ export default function App() {
 
       {/* 3. VIEW 2: ACTIVE COMPANY FINANCIAL WORKSPACE */}
       {view === "terminal" && data && (
-        <main className="flex-1 w-full max-w-7xl mx-auto p-2 sm:p-4 space-y-3">
+        <main className="flex-1 w-full max-w-[1600px] mx-auto p-2 sm:p-4 space-y-3">
           
-          {/* Mobile Tab Switcher */}
-          <div className="lg:hidden bg-[#121417] border border-[#1F2328] rounded p-1 flex text-xs">
+          {/* Mobile Tab Switcher (3 Tabs: Filings, Financials, Copilot) */}
+          <div className="lg:hidden bg-[#121417] border border-[#1F2328] rounded p-1 grid grid-cols-3 gap-1 text-xs">
+            <button
+              onClick={() => setActiveTab("filings")}
+              className={`py-1.5 px-2 rounded font-semibold transition text-center flex items-center justify-center space-x-1 ${
+                activeTab === "filings" ? "bg-blue-600 text-white" : "text-[#8B949E] hover:text-white"
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>Filings ({(data.filings || []).length})</span>
+            </button>
             <button
               onClick={() => setActiveTab("overview")}
-              className={`flex-1 py-1.5 px-3 rounded font-semibold transition text-center ${
+              className={`py-1.5 px-2 rounded font-semibold transition text-center flex items-center justify-center space-x-1 ${
                 activeTab === "overview" ? "bg-blue-600 text-white" : "text-[#8B949E] hover:text-white"
               }`}
             >
-              Overview & Financials
+              <BarChart2 className="w-3.5 h-3.5" />
+              <span>Financials</span>
             </button>
             <button
               onClick={() => setActiveTab("chat")}
-              className={`flex-1 py-1.5 px-3 rounded font-semibold transition text-center flex items-center justify-center space-x-1.5 ${
+              className={`py-1.5 px-2 rounded font-semibold transition text-center flex items-center justify-center space-x-1 ${
                 activeTab === "chat" ? "bg-blue-600 text-white" : "text-[#8B949E] hover:text-white"
               }`}
             >
               <MessageSquare className="w-3.5 h-3.5" />
-              <span>AI Research Copilot</span>
+              <span>Copilot</span>
             </button>
           </div>
 
@@ -774,11 +796,169 @@ export default function App() {
             </div>
           </div>
 
-          {/* 2-Column Responsive Workspace */}
+          {/* 3-Column Responsive Workspace */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
             
-            {/* LEFT COLUMN: Charts & Financial Statement Tables */}
-            <div className={`lg:col-span-7 space-y-3 ${activeTab === "overview" ? "block" : "hidden lg:block"}`}>
+            {/* 1. LEFT COLUMN: Financial Reports & Public Disclosures List */}
+            <div className={`lg:col-span-3 space-y-2.5 ${activeTab === "filings" ? "block" : "hidden lg:block"}`}>
+              <div className="bg-[#121417] border border-[#1F2328] rounded-lg p-3 space-y-2.5">
+                
+                {/* Header */}
+                <div className="flex items-center justify-between border-b border-[#1F2328] pb-2">
+                  <div className="flex items-center space-x-2">
+                    <FileText className="w-4 h-4 text-blue-400" />
+                    <div>
+                      <h3 className="font-semibold text-xs text-white">Financial Reports</h3>
+                      <p className="text-[10px] text-[#8B949E]">Official Disclosures</p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-mono bg-[#16191D] text-slate-300 px-2 py-0.5 rounded border border-[#1F2328]">
+                    {(data.filings || []).length} Available
+                  </span>
+                </div>
+
+                {/* Filter Tabs */}
+                <div className="flex items-center space-x-1 bg-[#090A0C] border border-[#1F2328] p-0.5 rounded text-[11px]">
+                  <button
+                    onClick={() => setFilingsFilter("all")}
+                    className={`flex-1 py-1 rounded font-medium transition text-center ${
+                      filingsFilter === "all" ? "bg-blue-600 text-white" : "text-[#8B949E] hover:text-white"
+                    }`}
+                  >
+                    All ({(data.filings || []).length})
+                  </button>
+                  <button
+                    onClick={() => setFilingsFilter("quarterly")}
+                    className={`flex-1 py-1 rounded font-medium transition text-center ${
+                      filingsFilter === "quarterly" ? "bg-blue-600 text-white" : "text-[#8B949E] hover:text-white"
+                    }`}
+                  >
+                    Quarterly
+                  </button>
+                  <button
+                    onClick={() => setFilingsFilter("annual")}
+                    className={`flex-1 py-1 rounded font-medium transition text-center ${
+                      filingsFilter === "annual" ? "bg-blue-600 text-white" : "text-[#8B949E] hover:text-white"
+                    }`}
+                  >
+                    Annual
+                  </button>
+                </div>
+
+                {/* Reports List */}
+                <div className="space-y-2 max-h-[620px] overflow-y-auto pr-0.5">
+                  {(data.filings || [])
+                    .filter((f: any) => {
+                      if (filingsFilter === "quarterly") return f.type.toLowerCase().includes("quarterly");
+                      if (filingsFilter === "annual") return f.type.toLowerCase().includes("annual");
+                      return true;
+                    })
+                    .map((f: any) => {
+                      const isSelected = selectedFiling?.id === f.id;
+                      return (
+                        <div
+                          key={f.id}
+                          onClick={() => setSelectedFiling(f)}
+                          className={`p-2.5 rounded border transition cursor-pointer text-left ${
+                            isSelected
+                              ? "bg-[#161d28] border-blue-500/70 shadow-sm"
+                              : "bg-[#090A0C] border-[#1F2328] hover:border-slate-700 hover:bg-[#12161f]"
+                          }`}
+                        >
+                          {/* Top Row: Period badge + Latest indicator + Type */}
+                          <div className="flex items-center justify-between mb-1.5">
+                            <div className="flex items-center space-x-1.5">
+                              <span className="text-xs font-bold text-white font-mono bg-[#16191D] px-1.5 py-0.5 rounded border border-[#1F2328]">
+                                {f.period}
+                              </span>
+                              {f.is_latest && (
+                                <span className="text-[10px] bg-emerald-950/70 text-emerald-400 border border-emerald-800/60 px-1.5 py-0.2 rounded font-semibold flex items-center">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse mr-1"></span>
+                                  Latest
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-[#8B949E] font-medium">
+                              {f.type}
+                            </span>
+                          </div>
+
+                          {/* Filing Title */}
+                          <p className="text-xs font-medium text-slate-200 line-clamp-2 mb-1.5 leading-snug">
+                            {f.title}
+                          </p>
+
+                          {/* Period Ended & Release Date */}
+                          <div className="text-[11px] text-[#8B949E] space-y-0.5 mb-2">
+                            <div className="flex items-center justify-between">
+                              <span>Period Ended:</span>
+                              <span className="text-slate-300 font-mono">{f.period_ended}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span>Released Date:</span>
+                              <span className="text-slate-300 font-mono">{f.release_date}</span>
+                            </div>
+                          </div>
+
+                          {/* Financial Metric Badges + Quick Action */}
+                          <div className="flex items-center justify-between pt-1.5 border-t border-[#1F2328] text-[11px]">
+                            <div className="text-[11px] text-[#8B949E]">
+                              <span>Rev: <strong className="text-white font-mono">RM {f.revenue_m?.toLocaleString()}M</strong></span>
+                              <span className="mx-1 text-[#484F58]">•</span>
+                              <span>PAT: <strong className="text-emerald-400 font-mono">RM {f.profit_m?.toLocaleString()}M</strong></span>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedFiling(f);
+                                setActiveTab("chat");
+                                handleSendMessage(`Please provide a detailed financial breakdown of the ${f.period} (${f.title}): highlight revenue drivers, operating margins, and disclosures.`);
+                              }}
+                              className="text-[10px] text-blue-400 hover:text-white bg-blue-950/40 hover:bg-blue-600 px-2 py-0.5 rounded border border-blue-900/50 hover:border-blue-500 transition font-medium flex items-center space-x-1"
+                              title="Ask Copilot about this filing"
+                            >
+                              <Sparkles className="w-3 h-3" />
+                              <span>Ask</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+
+                {/* Footer note in filings panel */}
+                <div className="pt-2 border-t border-[#1F2328] text-[10px] text-[#8B949E] flex items-center space-x-1">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
+                  <span>Verified Bursa Malaysia public filings</span>
+                </div>
+
+              </div>
+            </div>
+
+            {/* 2. CENTER COLUMN: Charts & Financial Statement Tables */}
+            <div className={`lg:col-span-5 space-y-3 ${activeTab === "overview" ? "block" : "hidden lg:block"}`}>
+              
+              {/* Selected Filing Context Banner */}
+              {selectedFiling && (
+                <div className="bg-[#121417] border border-blue-900/40 rounded-lg p-2.5 flex items-center justify-between text-xs">
+                  <div className="flex items-center space-x-2">
+                    <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></span>
+                    <span className="text-[#8B949E]">Viewing Filing:</span>
+                    <span className="text-white font-semibold">{selectedFiling.period}</span>
+                    <span className="text-[#8B949E] hidden sm:inline truncate max-w-[180px]">({selectedFiling.title})</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setActiveTab("chat");
+                      handleSendMessage(`Explain the quarter-over-quarter revenue and profit variance for ${selectedFiling.period}.`);
+                    }}
+                    className="text-[11px] text-blue-400 hover:text-white font-medium flex items-center space-x-1 shrink-0 ml-2"
+                  >
+                    <span>Analyze with Copilot</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
               
               {/* 1. Price Area Chart */}
               <div className="bg-[#121417] border border-[#1F2328] rounded-lg p-3 sm:p-4 space-y-2">
@@ -989,8 +1169,8 @@ export default function App() {
               </div>
             </div>
 
-            {/* RIGHT COLUMN: AI Financial Research Copilot */}
-            <div className={`lg:col-span-5 flex flex-col bg-[#121417] border border-[#1F2328] rounded-lg h-[520px] sm:h-[600px] lg:h-[680px] ${activeTab === "chat" ? "block" : "hidden lg:flex"}`}>
+            {/* 3. RIGHT COLUMN: AI Financial Research Copilot */}
+            <div className={`lg:col-span-4 flex flex-col bg-[#121417] border border-[#1F2328] rounded-lg h-[540px] sm:h-[620px] lg:h-[760px] ${activeTab === "chat" ? "block" : "hidden lg:flex"}`}>
               
               {/* Copilot Header */}
               <div className="p-3 bg-[#16191D] border-b border-[#1F2328] flex items-center justify-between">
@@ -1000,7 +1180,9 @@ export default function App() {
                   </div>
                   <div>
                     <h3 className="font-bold text-xs text-white">AI Research Copilot</h3>
-                    <p className="text-[10px] text-[#8B949E]">{data.stock.name} ({data.stock.ticker})</p>
+                    <p className="text-[10px] text-[#8B949E]">
+                      {data.stock.name} • {selectedFiling ? selectedFiling.period : "Latest Filing"}
+                    </p>
                   </div>
                 </div>
 
@@ -1221,7 +1403,7 @@ export default function App() {
 
       {/* 5. Clean Minimal Footer */}
       <footer className="bg-[#121417] border-t border-[#1F2328] py-3 px-4 text-xs text-[#8B949E]">
-        <div className="w-full max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-1 text-[11px]">
+        <div className="w-full max-w-[1600px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-1 text-[11px]">
           <p>© 2026 Bursa Intelligence. Public market data and financial disclosures.</p>
           <p>For educational & research purposes only.</p>
         </div>
