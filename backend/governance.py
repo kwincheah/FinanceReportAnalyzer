@@ -11,19 +11,40 @@ class PIISanitizer:
     Scrubs Personally Identifiable Information (PII) at the system boundary
     before any text is sent to an external LLM provider.
     """
-    # Malaysian NRIC pattern: YYMMDD-PB-###G (e.g. 901231-14-5678 or 901231145678)
+    # Malaysian NRIC: YYMMDD-PB-###G (e.g. 901231-14-5678 or 901231145678).
+    # Validated structurally so 12-digit financial figures are never redacted.
     NRIC_PATTERN = r'\b\d{6}-?\d{2}-?\d{4}\b'
     EMAIL_PATTERN = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
     # Malaysian Phone Pattern: +601x-xxx xxxx or 01x-xxx xxxx
     PHONE_PATTERN = r'\b(?:\+?60|0)1[0-46-9]-?\d{7,8}\b'
 
     @classmethod
+    def _looks_like_nric(cls, candidate: str) -> bool:
+        """YYMMDD prefix must be a real calendar date for the value to be an NRIC."""
+        digits = re.sub(r'\D', '', candidate)
+        if len(digits) != 12:
+            return False
+        yy, mm, dd = int(digits[0:2]), int(digits[2:4]), int(digits[4:6])
+        if not (1 <= mm <= 12 and 1 <= dd <= 31):
+            return False
+        # Plausible birth years: 1900-2099 mapped from the two-digit prefix.
+        return 0 <= yy <= 99
+
+    @classmethod
     def sanitize(cls, text: str) -> tuple[str, list[str]]:
         redacted = []
+        if not isinstance(text, str):
+            text = "" if text is None else str(text)
 
-        if re.search(cls.NRIC_PATTERN, text):
-            text = re.sub(cls.NRIC_PATTERN, "[REDACTED_NRIC]", text)
+        def _nric_repl(match: "re.Match[str]") -> str:
+            # Only redact when the value has a valid date prefix; otherwise it is
+            # almost certainly a monetary amount or account number.
+            return "[REDACTED_NRIC]" if cls._looks_like_nric(match.group(0)) else match.group(0)
+
+        new_text, nric_hits = re.subn(cls.NRIC_PATTERN, _nric_repl, text)
+        if nric_hits and new_text != text:
             redacted.append("NRIC")
+        text = new_text
 
         if re.search(cls.EMAIL_PATTERN, text):
             text = re.sub(cls.EMAIL_PATTERN, "[REDACTED_EMAIL]", text)

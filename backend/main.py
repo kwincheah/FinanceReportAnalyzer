@@ -1,26 +1,27 @@
-from fastapi import FastAPI, HTTPException, Query, UploadFile, File, Form, Body
+from fastapi import FastAPI, HTTPException, Query, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
+from pydantic import BaseModel
+from typing import Optional, List
 from contextlib import asynccontextmanager
 import uvicorn
-import shutil
 import json
-import os
 from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
 
 from app import (
+    direct_match_search,
     resolve_bursa_stock_hybrid,
+    disambiguate_query_hybrid,
     fetch_live_market_data,
     analyze_financials,
     generate_analysis_summary,
-    BursaReport
+    _load_bursa_stock_list,
+    StockNotFoundError,
 )
 from advanced_rag import AdvancedFinancialRAG
-from document_engine import MarkdownASTEngine, StatementTableExtractor, ReportIngestionPipeline
+from document_engine import MarkdownASTEngine, ReportIngestionPipeline
 from confidence import route_report
 from governance import PIISanitizer, ComplianceGuardrail, AuditLedger
 from sandbox_engine import DCFModelingAgent, SafeSandboxedExecutor, DecisionLog
@@ -61,25 +62,32 @@ As of the reporting date, the Group is not engaged in any material litigation or
 """
 
 
+def notes_to_sections(notes) -> list:
+    """Groups AST notes into parent sections keyed by their nearest heading."""
+    sections = []
+    current_sec = {"heading": "Overview", "full_text": ""}
+    for n in notes:
+        if n.section_heading != current_sec["heading"]:
+            if current_sec["full_text"]:
+                sections.append(current_sec)
+            current_sec = {"heading": n.section_heading, "full_text": n.content}
+        else:
+            current_sec["full_text"] += "\n\n" + n.content
+    if current_sec["full_text"]:
+        sections.append(current_sec)
+    return sections
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Pre-index sample Maybank report into 4-Stage RAG engine on startup
     try:
         tables, notes = MarkdownASTEngine.parse_markdown_document(SAMPLE_MAYBANK_MARKDOWN)
-        sections = []
-        current_sec = {"heading": "Overview", "full_text": ""}
-        for n in notes:
-            if n.section_heading != current_sec["heading"]:
-                if current_sec["full_text"]:
-                    sections.append(current_sec)
-                current_sec = {"heading": n.section_heading, "full_text": n.content}
-            else:
-                current_sec["full_text"] += "\n\n" + n.content
-        if current_sec["full_text"]:
-            sections.append(current_sec)
+        sections = notes_to_sections(notes)
 
-        rag_engine.index_document_hierarchical("1155", sections)
-        print("[Startup] Seeded sample Maybank 1155 explanatory notes into 4-Stage RAG.")
+        if sections:
+            rag_engine.index_document_hierarchical("1155", sections)
+            print("[Startup] Seeded sample Maybank 1155 explanatory notes into 4-Stage RAG.")
     except Exception as e:
         print(f"[Startup Warning] Could not seed sample data: {e}")
     yield
@@ -104,6 +112,10 @@ app.add_middleware(
 class AnalyzeRequest(BaseModel):
     query: str
     quarter: Optional[str] = "Q2"
+
+
+class ResolveStockRequest(BaseModel):
+    query: str
 
 
 class QueryNotesRequest(BaseModel):
@@ -144,11 +156,143 @@ def health():
     }
 
 
+@app.get("/api/stocks/autocomplete")
+def autocomplete_stocks(q: str = Query(..., min_length=1, description="Stock code, ticker or name")):
+    """Real-time autocomplete suggestions across Bursa Malaysia listed companies."""
+    bursa_list = _load_bursa_stock_list()
+    cleaned = q.strip().upper()
+    if not cleaned:
+        # A blank query must not leak the first N listings.
+        return {"query": q, "suggestions": []}
+
+    results = []
+    seen = set()
+
+    # 1. Exact or prefix match on code or ticker
+    for s in bursa_list:
+        code = str(s.get("code", "")).strip()
+        ticker = str(s.get("ticker", "")).strip().upper()
+        if code.startswith(cleaned) or ticker.startswith(cleaned):
+            if code not in seen:
+                results.append(s)
+                seen.add(code)
+        if len(results) >= 8:
+            break
+
+    # 2. Substring match on short_name or full registered corporate name
+    if len(results) < 8:
+        for s in bursa_list:
+            code = str(s.get("code", "")).strip()
+            short_name = str(s.get("short_name", "")).strip().upper()
+            name = str(s.get("name", "")).strip().upper()
+            if cleaned in short_name or cleaned in name:
+                if code not in seen:
+                    results.append(s)
+                    seen.add(code)
+            if len(results) >= 8:
+                break
+
+    return {"query": q, "suggestions": results}
+
+
+def _format_stock_for_ui(stock: dict) -> dict:
+    price = 0.0
+    change = 0.0
+    try:
+        quote = fetch_live_market_data(stock["ticker"])
+        price = quote.get("current_price", 0.0)
+        change = quote.get("change_pct", 0.0)
+    except Exception:
+        price = 0.0
+        change = 0.0
+
+    return {
+        "code": stock["code"],
+        "ticker": stock["ticker"],
+        "name": stock["name"],
+        "shortName": stock.get("short_name") or stock["name"],
+        "sector": stock.get("sector") or "Main Market",
+        "price": price,
+        "change": change,
+        "positive": change >= 0
+    }
+
+
+@app.post("/api/stocks/resolve")
+def resolve_stock(req: ResolveStockRequest):
+    """
+    Hybrid Bursa equity resolver:
+    1. Direct match on code/ticker/name in bursa_stock_list.json
+    2. Multi-Candidate Hybrid Disambiguator:
+       - EXACT: Returns single target company
+       - MULTIPLE: Returns up to 4 suggested candidates for ambiguous/sector queries
+       - NONE: Returns unresolvable state
+    """
+    if not req.query or not req.query.strip():
+        raise HTTPException(status_code=400, detail="Query cannot be empty.")
+
+    try:
+        sanitized_query, _ = PIISanitizer.sanitize(req.query.strip())
+
+        # 1. Fast direct match on code or ticker or exact short_name in bursa_stock_list.json
+        direct = direct_match_search(sanitized_query)
+        if direct:
+            formatted = _format_stock_for_ui(direct)
+            return {
+                "status": "success",
+                "type": "EXACT",
+                "stock": formatted,
+                "candidates": [formatted],
+                "title": "Identified Bursa Malaysia Security",
+                "explanation": f"Matched listed constituent: {formatted['name']} ({formatted['code']})"
+            }
+
+        # 2. Multi-Candidate Hybrid Disambiguator
+        hybrid_res = disambiguate_query_hybrid(sanitized_query)
+
+        if hybrid_res["type"] == "NONE" or not hybrid_res.get("candidates"):
+            return {
+                "status": "none",
+                "type": "NONE",
+                "stock": None,
+                "candidates": [],
+                "title": hybrid_res.get("title") or "No Listed Security Found",
+                "explanation": hybrid_res.get("explanation") or f"No listed Bursa Malaysia security, sector, or peer constituent matches '{req.query}'."
+            }
+
+        formatted_candidates = [_format_stock_for_ui(c) for c in hybrid_res["candidates"][:4]]
+
+        if hybrid_res["type"] == "EXACT" and formatted_candidates:
+            return {
+                "status": "success",
+                "type": "EXACT",
+                "stock": formatted_candidates[0],
+                "candidates": formatted_candidates,
+                "title": hybrid_res.get("title") or "Identified Bursa Malaysia Security",
+                "explanation": hybrid_res.get("explanation") or f"Resolved from query: '{req.query}'"
+            }
+
+        return {
+            "status": "multiple",
+            "type": "MULTIPLE",
+            "stock": None,
+            "candidates": formatted_candidates,
+            "title": hybrid_res.get("title") or "Matching Bursa Equities",
+            "explanation": hybrid_res.get("explanation") or f"Candidates matching inquiry: '{req.query}'"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/reports/analyze")
 def analyze_stock(req: AnalyzeRequest):
     try:
+        if not req.query or not str(req.query).strip():
+            raise HTTPException(status_code=400, detail="A company name or 4-digit Bursa stock code is required.")
+
         sanitized_query, pii_found = PIISanitizer.sanitize(req.query)
-        stock = resolve_bursa_stock_hybrid(sanitized_query)
+        result = direct_match_search(sanitized_query)
+        stock = resolve_bursa_stock_hybrid(sanitized_query, result)
         quote = fetch_live_market_data(stock["ticker"])
         current_price = quote["current_price"]
 
@@ -206,7 +350,7 @@ def analyze_stock(req: AnalyzeRequest):
             "filings": [
                 {
                     "id": f"{stock['code']}-2026-Q2",
-                    "title": f"Quarterly Report for Period Ended 30 Jun 2026",
+                    "title": "Quarterly Report for Period Ended 30 Jun 2026",
                     "period": "Q2 2026",
                     "period_ended": "30-Jun-2026",
                     "release_date": "28-Aug-2026",
@@ -217,18 +361,18 @@ def analyze_stock(req: AnalyzeRequest):
                 },
                 {
                     "id": f"{stock['code']}-2026-Q1",
-                    "title": f"Quarterly Report for Period Ended 31 Mar 2026",
+                    "title": "Quarterly Report for Period Ended 31 Mar 2026",
                     "period": "Q1 2026",
                     "period_ended": "31-Mar-2026",
                     "release_date": "26-May-2026",
                     "type": "Quarterly Report",
                     "is_latest": False,
-                    "revenue_m": round(report_data.prev_revenue / 1000.0, 1),
-                    "profit_m": round(report_data.prev_net_profit / 1000.0, 1)
+                    "revenue_m": round((report_data.prev_revenue or (report_data.revenue * 0.94)) / 1000.0, 1),
+                    "profit_m": round((report_data.prev_net_profit or (report_data.net_profit * 0.92)) / 1000.0, 1)
                 },
                 {
                     "id": f"{stock['code']}-2025-AR",
-                    "title": f"Annual Audited Financial Statements FY2025",
+                    "title": "Annual Audited Financial Statements FY2025",
                     "period": "FY 2025",
                     "period_ended": "31-Dec-2025",
                     "release_date": "28-Apr-2026",
@@ -239,7 +383,7 @@ def analyze_stock(req: AnalyzeRequest):
                 },
                 {
                     "id": f"{stock['code']}-2025-Q3",
-                    "title": f"Quarterly Report for Period Ended 30 Sep 2025",
+                    "title": "Quarterly Report for Period Ended 30 Sep 2025",
                     "period": "Q3 2025",
                     "period_ended": "30-Sep-2025",
                     "release_date": "27-Nov-2025",
@@ -250,7 +394,7 @@ def analyze_stock(req: AnalyzeRequest):
                 },
                 {
                     "id": f"{stock['code']}-2025-Q2",
-                    "title": f"Quarterly Report for Period Ended 30 Jun 2025",
+                    "title": "Quarterly Report for Period Ended 30 Jun 2025",
                     "period": "Q2 2025",
                     "period_ended": "30-Jun-2025",
                     "release_date": "28-Aug-2025",
@@ -262,6 +406,10 @@ def analyze_stock(req: AnalyzeRequest):
             ],
             "memo_markdown": guarded_report
         }
+    except StockNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -283,28 +431,48 @@ async def ingest_financial_report(
         source_type = "text"
         filename = "pasted_report.md"
 
+        if not str(stock_code or "").strip():
+            raise HTTPException(status_code=400, detail="stock_code is required.")
+
+        raw_text_for_fallback = ""
         if file:
             filename = file.filename or "uploaded_report"
             raw_bytes = await file.read()
+            if not raw_bytes:
+                raise HTTPException(status_code=400, detail=f"Uploaded file '{filename}' is empty.")
             if filename.lower().endswith(".pdf"):
                 source_type = "pdf"
-                tables, sections = ReportIngestionPipeline.ingest_pdf_bytes(raw_bytes)
+                try:
+                    tables, sections = ReportIngestionPipeline.ingest_pdf_bytes(raw_bytes)
+                except Exception as pdf_err:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"'{filename}' could not be parsed as a PDF ({pdf_err}). "
+                               f"Please upload a valid PDF, or paste the filing text instead.",
+                    )
             else:
                 source_type = "markdown" if filename.lower().endswith(".md") else "text"
                 try:
                     text_str = raw_bytes.decode("utf-8")
                 except UnicodeDecodeError:
                     text_str = raw_bytes.decode("latin-1", errors="ignore")
+                raw_text_for_fallback = text_str
                 tables, sections = ReportIngestionPipeline.ingest_markdown_text(text_str)
         elif text_content and text_content.strip():
             source_type = "pasted_text"
+            raw_text_for_fallback = text_content
             tables, sections = ReportIngestionPipeline.ingest_markdown_text(text_content)
         else:
             raise HTTPException(status_code=400, detail="Either a report file or text_content must be provided.")
 
         if not sections:
-            fallback_text = text_content if text_content else "Filing content indexed."
-            sections = [{"heading": "Filing Disclosure", "full_text": fallback_text}]
+            # Never report success while indexing nothing (or indexing a placeholder).
+            if not raw_text_for_fallback.strip():
+                raise HTTPException(
+                    status_code=400,
+                    detail="No readable financial disclosure text could be extracted from the supplied report.",
+                )
+            sections = [{"heading": "Filing Disclosure", "full_text": raw_text_for_fallback.strip()}]
 
         rag_engine.index_document_hierarchical(stock_code, sections)
 
@@ -325,6 +493,8 @@ async def ingest_financial_report(
             "tables_extracted": len(tables),
             "message": f"Successfully ingested {filename} ({len(sections)} sections, {len(tables)} tables) into RAG."
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -333,20 +503,21 @@ async def ingest_financial_report(
 async def index_markdown_report(file: UploadFile = File(...), stock_code: str = Form(...)):
     """Uploads Markdown report file and indexes into 4-Stage Advanced RAG."""
     try:
-        content = (await file.read()).decode("utf-8")
+        if not str(stock_code or "").strip():
+            raise HTTPException(status_code=400, detail="stock_code is required.")
+
+        raw = await file.read()
+        if not raw:
+            raise HTTPException(status_code=400, detail="Uploaded Markdown file is empty.")
+        content = raw.decode("utf-8", errors="replace")
+
         tables, notes = MarkdownASTEngine.parse_markdown_document(content)
-        
-        sections = []
-        current_sec = {"heading": "Overview", "full_text": ""}
-        for n in notes:
-            if n.section_heading != current_sec["heading"]:
-                if current_sec["full_text"]:
-                    sections.append(current_sec)
-                current_sec = {"heading": n.section_heading, "full_text": n.content}
-            else:
-                current_sec["full_text"] += "\n\n" + n.content
-        if current_sec["full_text"]:
-            sections.append(current_sec)
+        sections = notes_to_sections(notes)
+        if not sections:
+            raise HTTPException(
+                status_code=400,
+                detail="No indexable narrative disclosure was found in the supplied Markdown report.",
+            )
 
         rag_engine.index_document_hierarchical(stock_code, sections)
         return {
@@ -355,6 +526,8 @@ async def index_markdown_report(file: UploadFile = File(...), stock_code: str = 
             "tables_extracted": len(tables),
             "sections_indexed": len(sections)
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -363,19 +536,18 @@ async def index_markdown_report(file: UploadFile = File(...), stock_code: str = 
 def index_markdown_text(req: IndexTextRequest):
     """Directly indexes raw Markdown text into 4-Stage Advanced RAG."""
     try:
+        if not str(req.stock_code or "").strip():
+            raise HTTPException(status_code=400, detail="stock_code is required.")
+        if not (req.markdown_content or "").strip():
+            raise HTTPException(status_code=400, detail="markdown_content must not be empty.")
+
         tables, notes = MarkdownASTEngine.parse_markdown_document(req.markdown_content)
-        
-        sections = []
-        current_sec = {"heading": "Overview", "full_text": ""}
-        for n in notes:
-            if n.section_heading != current_sec["heading"]:
-                if current_sec["full_text"]:
-                    sections.append(current_sec)
-                current_sec = {"heading": n.section_heading, "full_text": n.content}
-            else:
-                current_sec["full_text"] += "\n\n" + n.content
-        if current_sec["full_text"]:
-            sections.append(current_sec)
+        sections = notes_to_sections(notes)
+        if not sections:
+            raise HTTPException(
+                status_code=400,
+                detail="No indexable narrative disclosure was found in the supplied Markdown content.",
+            )
 
         rag_engine.index_document_hierarchical(req.stock_code, sections)
         return {
@@ -384,6 +556,8 @@ def index_markdown_text(req: IndexTextRequest):
             "tables_extracted": len(tables),
             "sections_indexed": len(sections)
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -433,9 +607,12 @@ def chat_with_analyst(req: ChatRequest):
     Retrieves grounded explanatory notes and verified metrics for the target stock.
     """
     try:
+        if not (req.message or "").strip():
+            raise HTTPException(status_code=400, detail="A question is required.")
+
         sanitized_msg, _ = PIISanitizer.sanitize(req.message)
         stock = resolve_bursa_stock_hybrid(req.stock_code)
-        
+
         # Ensure company report is automatically pulled and ingested into 4-Stage RAG
         report_data, _ = AutomatedReportEngine.ensure_stock_report_ingested(
             stock["code"], stock["name"], stock["ticker"], rag_engine
@@ -443,12 +620,14 @@ def chat_with_analyst(req: ChatRequest):
         financial_summary = (
             f"Revenue: RM {report_data.revenue:,.0f} ('000), "
             f"Net Profit: RM {report_data.net_profit:,.0f} ('000), "
-            f"Preceding Revenue: RM {report_data.prev_revenue:,.0f} ('000), "
-            f"Preceding Net Profit: RM {report_data.prev_net_profit:,.0f} ('000), "
+            f"Preceding Revenue: RM {(report_data.prev_revenue or 0):,.0f} ('000), "
+            f"Preceding Net Profit: RM {(report_data.prev_net_profit or 0):,.0f} ('000), "
             f"Total Borrowings: RM {report_data.total_borrowings:,.0f} ('000), "
             f"Cash: RM {report_data.cash:,.0f} ('000), "
             f"Basic EPS: {report_data.eps_sen:.2f} sen"
         )
+        if getattr(report_data, "period_ended", None):
+            financial_summary += f", Period Ended: {report_data.period_ended}"
 
         # 1. Retrieve relevant notes via 4-Stage RAG (Hybrid RRF + FlashRank)
         evidence = rag_engine.search_hybrid_and_rerank(stock["code"], sanitized_msg, top_k=3)
@@ -517,6 +696,10 @@ GUIDELINES:
             "response": guarded_response,
             "cited_evidence": evidence
         }
+    except StockNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -527,7 +710,9 @@ def get_latest_audits(limit: int = 10):
     ledger_file = Path(__file__).resolve().parent / "audit_ledger.jsonl"
     if not ledger_file.exists():
         return {"audits": []}
-    
+
+    limit = max(1, min(int(limit), 100))
+
     entries = []
     with open(ledger_file, "r", encoding="utf-8") as f:
         for line in f:

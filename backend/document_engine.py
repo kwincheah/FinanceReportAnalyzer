@@ -1,15 +1,14 @@
 import mistune
-import chromadb
 import re
-from typing import Dict, List, Tuple
+from typing import List, Tuple
 from google import genai
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from dotenv import load_dotenv
 
 # Load env
 load_dotenv()
 
-from app import BursaReport, analyze_financials
+from app import BursaReport
 
 
 class ASTExtractedTable(BaseModel):
@@ -44,9 +43,16 @@ class MarkdownASTEngine:
 
         current_heading = "DOCUMENT_ROOT"
 
-        # Regex to capture raw markdown tables directly from text if needed
-        table_regex = re.compile(r'(\|.+?\|\n\|[-:| ]+\|\n(?:\|.+?\|\n?)+)', re.MULTILINE)
-        extracted_raw_tables = table_regex.findall(md_text)
+        # Regex to capture complete raw markdown tables directly from the source text.
+        # Every row must start with a pipe and end with a pipe: an unterminated
+        # lazy match used to truncate rows after their second cell.
+        table_regex = re.compile(
+            r'(^[ \t]*\|[^\n]*\|[ \t]*\n'          # header row
+            r'^[ \t]*\|[-:| \t]+\|[ \t]*(?:\n|$)'  # alignment separator row
+            r'(?:^[ \t]*\|[^\n]*\|[ \t]*(?:\n|$))*)',  # body rows
+            re.MULTILINE,
+        )
+        extracted_raw_tables = [m.group(0).rstrip("\n") for m in table_regex.finditer(md_text)]
         raw_table_idx = 0
 
         for token in tokens:
@@ -66,8 +72,12 @@ class MarkdownASTEngine:
 
             # 2. Extract atomic table nodes
             elif token_type == "table":
-                # Use raw matched table if available, or markdown block
-                tbl_content = extracted_raw_tables[raw_table_idx] if raw_table_idx < len(extracted_raw_tables) else md_text
+                if raw_table_idx < len(extracted_raw_tables):
+                    tbl_content = extracted_raw_tables[raw_table_idx]
+                else:
+                    # Fall back to rebuilding the table from the AST token so an
+                    # unmatched table never degrades into "the whole document".
+                    tbl_content = cls._render_table_token(token)
                 tables.append(ASTExtractedTable(
                     parent_section=current_heading,
                     markdown_table=tbl_content
@@ -90,6 +100,46 @@ class MarkdownASTEngine:
                     ))
 
         return tables, notes
+
+    @classmethod
+    def _render_table_token(cls, token: dict) -> str:
+        """Rebuilds a Markdown table from a mistune AST table token (fallback path)."""
+        def cell_text(cell: dict) -> str:
+            parts = []
+            for child in cell.get("children", []) or []:
+                if isinstance(child, dict):
+                    parts.append(str(child.get("raw") or child.get("text") or ""))
+            return "".join(parts).replace("|", "\\|").strip()
+
+        header_cells: List[str] = []
+        body_rows: List[List[str]] = []
+
+        for section in token.get("children", []) or []:
+            if not isinstance(section, dict):
+                continue
+            sec_type = section.get("type")
+            if sec_type == "table_head":
+                header_cells = [cell_text(c) for c in section.get("children", []) or [] if isinstance(c, dict)]
+            elif sec_type == "table_body":
+                for row in section.get("children", []) or []:
+                    if not isinstance(row, dict):
+                        continue
+                    if row.get("type") == "table_row":
+                        body_rows.append([
+                            cell_text(c) for c in row.get("children", []) or [] if isinstance(c, dict)
+                        ])
+
+        if not header_cells:
+            return ""
+
+        lines = [
+            "| " + " | ".join(header_cells) + " |",
+            "| " + " | ".join(["---"] * len(header_cells)) + " |",
+        ]
+        for row in body_rows:
+            padded = row + [""] * (len(header_cells) - len(row))
+            lines.append("| " + " | ".join(padded[: len(header_cells)]) + " |")
+        return "\n".join(lines)
 
 
 class StatementTableExtractor:

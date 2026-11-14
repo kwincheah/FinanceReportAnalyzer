@@ -5,8 +5,7 @@ import sys
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-from pydantic import BaseModel, Field
-from typing import Optional
+from pydantic import BaseModel
 from google import genai
 from dotenv import load_dotenv
 

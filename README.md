@@ -7,7 +7,11 @@
 [![TailwindCSS](https://img.shields.io/badge/Style-Tailwind%20CSS-38B2AC?style=flat&logo=tailwind-css)](https://tailwindcss.com/)
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat&logo=python)](https://python.org/)
 
-**Bursa Intelligence** is an institutional-grade financial analysis terminal and web application designed for Bursa Malaysia equities. It combines automated regulatory quarterly report ingestion, live financial statements, interactive dynamic charting, and a **4-Stage Modular RAG Pipeline** powering an AI Analyst Copilot that cites regulatory notes (`[Note B1]`, `[Note B3]`, etc.) in compliance with Malaysia's Capital Markets and Services Act 2007 (CMSA).
+**Bursa Intelligence** is an institutional-grade financial intelligence and regulatory forensic terminal built for Bursa Malaysia equities. It combines real-time equity discovery, automated quarterly report ingestion, sector-appropriate financial modeling (Banking NIM/CIR vs. Corporate Gearing), and a **4-Stage Modular RAG Pipeline** powering an AI Research Copilot that cites regulatory notes (`[Note B1]`, `[Note B3]`, etc.) in compliance with Bursa Malaysia Listing Requirements (Paragraph 9.22) and the Capital Markets and Services Act 2007 (CMSA Malaysia).
+
+<p align="center">
+  <img src="docs/screenshots/04-banking-terminal.png" alt="Bursa Intelligence Terminal Workspace" width="100%" />
+</p>
 
 ---
 
@@ -15,57 +19,141 @@
 
 ```mermaid
 flowchart TD
-    User([User / Analyst]) --> UI[Next.js 15 Terminal UI / Tauri Desktop]
+    User([User / Equity Analyst]) --> UI[Next.js 15 Terminal UI / Tauri Desktop Shell]
     
     subgraph UI_Layer [Frontend: Port 3000]
-        StartPage[Institutional Start Page]
-        Workspace[Terminal Workspace]
-        Charts[Price Area & Revenue Bar Charts]
-        CopilotUI[Analyst Research Copilot]
+        StartPage[Institutional Start Page\n• Market Movers & 13 Sectors\n• Live Regulatory Disclosures\n• Intelligent Omnibar]
+        Workspace[Terminal Workspace\n• Unaudited Interim Reports (Para 9.22)\n• YoY & QoQ Comparison Matrix\n• Dual Banking vs Industrial Engine]
+        Valuation[Dynamic Valuation Models\n• Banking: Dividend Discount Model (DDM)\n• Industrial: 5-Year FCFF DCF Matrix]
+        CopilotUI[Analyst Research Copilot\n• Note Citations (Note B1–B6)\n• Export Memo (.md) & CSV (.csv)]
     end
     
     UI --> UI_Layer
     UI_Layer -->|REST / HTTP| API[FastAPI Backend: Port 8008]
     
-    subgraph Backend_Layer [Backend Services]
-        AutoPull[Automated Report Engine]
+    subgraph Backend_Services [Backend Architecture]
+        Resolver[Hybrid Equity Resolver & Disambiguator\n• EXACT: Direct Code / Ticker Match\n• MULTIPLE: Semantic Category Ranking\n• NONE: Centered Guidance Diagnostics]
+        AutoPull[Automated Report Ingestion Engine]
         RAG[4-Stage Modular RAG Pipeline]
-        Audit[CMSA 2007 Audit Ledger]
+        Sandbox[Sandboxed Valuation Engine]
+        Audit[CMSA 2007 Regulatory Audit Ledger]
     end
     
+    API --> Resolver
     API --> AutoPull
     API --> RAG
+    API --> Sandbox
     API --> Audit
     
     subgraph RAG_Pipeline [4-Stage RAG Pipeline]
         S1[Stage 1: Markdown AST Table & Section Chunking]
         S2[Stage 2: Hybrid Retrieval BM25 + ChromaDB via RRF]
         S3[Stage 3: FlashRank Neural Cross-Encoder Reranking]
-        S4[Stage 4: Grounded Synthesis with Note Citations]
+        S4[Stage 4: Grounded Synthesis with Regulatory Citations]
     end
     
     RAG --> S1 --> S2 --> S3 --> S4
-    S4 -->|Cited Analytical Notes| CopilotUI
+    S4 -->|Cited Notes [Note B1–B6]| CopilotUI
 ```
+
+---
+
+## 📸 Interface & Terminal Walkthrough
+
+### 1. Institutional Start Page & Discovery Ecosystem
+> Real-time macroeconomic pulse (FBM KLCI, USD/MYR, Brent, OPR), 8 popular Malaysian equities, tabbed Market Movers (Top Gainers/Losers/Active), 13 Bursa sectors heatmap, and live statutory disclosures stream.
+
+<p align="center">
+  <img src="docs/screenshots/01-start-page.png" alt="Institutional Start Page" width="100%" />
+</p>
+
+### 2. Intelligent Omnibar & 3-Tier Disambiguation
+> Instant autocomplete across 900+ listed constituents and 3-tier semantic intent resolution (Exact Match, Multi-Candidate Category Grids, and Centered Guidance for unlisted queries).
+
+| Real-Time Autocomplete | Query Confirmation Modal |
+| :---: | :---: |
+| <img src="docs/screenshots/02-autocomplete-search.png" alt="Autocomplete Search" width="100%" /> | <img src="docs/screenshots/03-target-confirmation.png" alt="Target Confirmation Modal" width="100%" /> |
+
+### 3. Sector-Aware Terminal Workstation (Banking vs. Corporate)
+> Dynamically adapts institutional KPI strips—displaying Net Interest Margin (NIM), Cost-to-Income (CIR), Gross Impaired Loans (GIL), and CET-1 for commercial banks, while rendering Gearing, Net Margin, and 5-quarter Revenue & PAT progression charts for corporate equities.
+
+| Commercial Banking Terminal (Maybank 1155) | Corporate Financials & YoY Matrix (Tenaga 5347) |
+| :---: | :---: |
+| <img src="docs/screenshots/04-banking-terminal.png" alt="Banking Terminal" width="100%" /> | <img src="docs/screenshots/05-corporate-terminal.png" alt="Corporate Terminal" width="100%" /> |
+
+### 4. 4-Stage Modular RAG Analyst Copilot
+> Grounded multi-turn conversational reasoning citing official regulatory notes (`[Note B1]`, `[Note B2]`) with strict CMSA 2007 compliance disclaimers and 1-click research memo / CSV export.
+
+<p align="center">
+  <img src="docs/screenshots/06-ai-analyst-copilot.png" alt="AI Financial Research Copilot Terminal" width="100%" />
+</p>
+
+### 5. Responsive Mobile Terminal
+> Institutional financial ergonomics preserved across tablets and mobile viewports with quick tabbed navigation between Filings, Overview, Summary, and Copilot.
+
+<p align="center">
+  <img src="docs/screenshots/07-mobile-terminal.png" alt="Mobile Terminal" width="45%" />
+</p>
 
 ---
 
 ## 🌟 Key Features
 
-* **Dedicated Start Page**: Clean, institutional landing page without aggressive auto-loading. Displays a centered hero search bar, 8 popular Malaysian equities (Maybank, Tenaga Nasional, CIMB, MR D.I.Y., Public Bank, Top Glove, PETRONAS Chemicals, YTL Power), and a minimalist macroeconomic pulse (FBM KLCI, USD/MYR, Brent Crude, BNM OPR).
-* **Automated On-Demand Filing Ingestion**: Enter any 4-digit Bursa code or company name—the engine pulls financial statements, synthesizes authentic regulatory filings (Condensed P&L, Balance Sheets, Part B Notes B1–B6), and indexes them into the RAG engine automatically.
-* **4-Stage Modular RAG Pipeline**:
-  1. **AST Chunking**: Abstract Syntax Tree parsing maintains atomic table integrity and establishes parent-child relationships for regulatory narrative notes.
-  2. **Hybrid Retrieval**: Dense ChromaDB vector embeddings fused with Sparse BM25 Okapi keywords using Reciprocal Rank Fusion (RRF).
-  3. **Neural Reranking**: Ultra-fast FlashRank cross-encoder (`ms-marco-TinyBERT-L-2-v2`) reranking candidate passages.
-  4. **Cited Synthesis**: Contextual compression generating answers citing specific notes (`[Note B1]`, `[Note B3]`, `[Note B5]`).
-* **Universal Filing Ingestion**: Drag-and-drop custom `.pdf`, `.md`, or `.txt` filings or paste raw filing text directly to analyze any company report.
-* **Interactive Financial Analytics**:
-  - Historical 5-quarter revenue vs. net profit progression bar charts.
-  - Price performance area charts.
-  - Interactive financial statements explorer.
-  - Dynamic Discounted Cash Flow (DCF) sensitivity matrix (WACC vs. Terminal Growth Rate).
-* **CMSA 2007 Compliance**: Non-advisory, objective financial research without speculative price targets, compliant with Section 58 of the Capital Markets and Services Act 2007.
+### 1. Hybrid Equity Resolver & Intelligent Omnibar
+* **Real-Time Autocomplete**: Instant search across 37+ cataloged equities and 900+ constituents in `bursa_stock_list.json` by stock code, ticker, or company name.
+* **3-Tier Semantic Disambiguation (`POST /api/stocks/resolve`)**:
+  * **`EXACT` Match**: Resolves unambiguous companies (e.g. `"Maybank"`, `"1155"`, `"Tenaga"`) directly with real-time price quotes.
+  * **`MULTIPLE` Candidates**: Resolves ambiguous industry or descriptive queries (e.g. `"toy company"`, `"banks"`, `"semiconductors"`, `"malaysia smallest company"`) into curated category suggestion cards (e.g. MR D.I.Y. `5296`, Velesto `5243`).
+  * **`NONE` Centered Modal**: Pops up an institutional diagnostic modal with clear explanations and suggested search tips for unrecognized or unlisted queries (`"haha"`, `"anaconda"`).
+* **Typo Normalization**: Seamlessly normalizes common input slips (`"malayusia"`, `"malysia"`, `"smalest"`).
+
+### 2. Sector-Aware Financial KPI Strips
+* **Commercial Banking Engine**: Dynamically detects banking institutions (Maybank, CIMB, Public Bank, RHB, Hong Leong, AmBank) via `isBankingSector()`. Automatically swaps corporate debt metrics for banking-specific metrics:
+  * **Net Interest Margin (NIM)**
+  * **Cost-to-Income Ratio (CIR)**
+  * **Gross Impaired Loans (GIL)**
+  * **CET-1 Capital Adequacy Ratio**
+* **Corporate & Industrial Engine**: Surfaces standard corporate financial metrics for non-financial companies:
+  * **Net Profit Margin**
+  * **Debt-to-Equity (Gearing Ratio)**
+  * **Net Debt Position**
+  * **52-Week Range & P/E Multiple**
+
+### 3. Dual Valuation Modeling
+* **Banking Valuation (Dividend Discount Model / DDM)**:
+  Uses the Gordon Growth Model tailored for financial institutions:
+  $$P_0 = \frac{DPS_1}{K_e - g}$$
+  Provides Conservative ($K_e = 10.0\%, g = 3.5\%$), Base ($K_e = 8.5\%, g = 4.0\%$), and Optimistic ($K_e = 7.5\%, g = 4.5\%$) sensitivity matrices with forward DPS projections.
+* **Industrial Valuation (5-Year DCF)**:
+  Free Cash Flow to Firm (FCFF) discounted cash flow model with WACC sensitivity (7.0% to 10.0%) and terminal growth rate assumptions.
+
+### 4. Regulatory Listing Requirements (Paragraph 9.22 & MFRS 134) Compliance
+* **Accurate Statutory Labeling**: Enforces strict labeling of quarterly reports as **"Unaudited Interim Financial Statements"** pursuant to Bursa Malaysia Main Market Listing Requirements (MMLR) Paragraph 9.22 and MFRS 134. Audited designations are strictly reserved for Annual Audited Financial Statements (AFS).
+* **3-Column Comparative Matrix**: Financial statement tables present:
+  * **Current Quarter**
+  * **Preceding Quarter (QoQ %)**
+  * **Corresponding Preceding Year Quarter (YoY %)** to account for seasonal business cycles.
+
+### 5. 4-Stage Modular RAG Pipeline with FlashRank
+1. **AST Chunking**: Abstract Syntax Tree parsing maintains atomic table integrity and preserves parent-child relationships for narrative notes.
+2. **Hybrid Retrieval**: Dense ChromaDB vector embeddings fused with Sparse BM25 Okapi keywords using Reciprocal Rank Fusion (RRF).
+3. **Neural Reranking**: Ultra-fast FlashRank cross-encoder (`ms-marco-TinyBERT-L-2-v2`) reranking candidate passages.
+4. **Cited Synthesis**: Contextual compression generating answers citing specific regulatory notes (`[Note B1]`, `[Note B3]`, `[Note B5]`).
+
+### 6. Institutional Start Page Ecosystem
+* **Macroeconomic Pulse**: Real-time reference indicators (FBM KLCI, USD/MYR, Brent Crude, BNM OPR).
+* **Market Movers**: Tabbed interactive tables for **Top Gainers**, **Top Losers**, and **Most Active** volume leaders.
+* **13 Bursa Malaysia Sectors**: Performance overview covering Financial Services, Energy, Technology, Healthcare, Plantation, Consumer, Telecommunications, and more.
+* **Live Disclosures Stream**: Real-time stream of latest quarterly filings with pre-built 1-click analyst questions.
+* **Quick Modules**: Direct shortcuts to Financial Screeners, Peer Benchmarking, and Dividend Rankings.
+
+### 7. Clean Session Isolation ("Always Start Fresh")
+* Every company lookup initializes a fresh institutional briefing without stale conversation transcripts or leftover search inputs contaminating your analysis session.
+* Manual **"Clear Transcript"** button available at any time.
+
+### 8. Analyst Export Suite
+* **Export Memo (`.md`)**: Generates an equity research memo containing executive summary, key drivers, risk factors, audit ledger hash, and confidence metrics.
+* **Export CSV (`.csv`)**: Exports the financial statements comparison matrix (Current, QoQ, YoY) directly into CSV format for immediate Excel modeling.
 
 ---
 
@@ -75,7 +163,24 @@ flowchart TD
 * **Backend**: Python 3.11+, FastAPI, Uvicorn, Pydantic v2
 * **RAG Engine**: ChromaDB, Rank-BM25, FlashRank, Mistune (AST Markdown parser), PyPDF
 * **AI Model**: Google Gemini API via `google-genai` SDK
-* **Desktop Wrapper**: Tauri v2 (Rust)
+* **Desktop Wrapper**: Tauri v2 (Rust + Windows Edge WebView2)
+
+---
+
+## 📡 API Reference
+
+The FastAPI backend runs on port `8008` (Swagger documentation at [http://localhost:8008/docs](http://localhost:8008/docs)):
+
+| Endpoint | Method | Description |
+| :--- | :--- | :--- |
+| `/api/health` | `GET` | System operational status, platform telemetry, and CMSA 2007 regulatory headers. |
+| `/api/stocks/search` | `GET` | Autocomplete search for Bursa equities by code, ticker, or name. |
+| `/api/stocks/resolve` | `POST` | 3-tier hybrid equity resolver (`EXACT`, `MULTIPLE`, `NONE`) with live market quotes. |
+| `/api/reports/analyze` | `POST` | Comprehensive company analysis, financial statement extraction, and filing ingestion. |
+| `/api/chat` | `POST` | Multi-turn RAG research copilot with regulatory note citations. |
+| `/api/rag/query` | `POST` | Direct 4-stage RAG passage retrieval with FlashRank neural reranking. |
+| `/api/rag/ingest` | `POST` | Universal filing document ingestion (`.pdf`, `.md`, `.txt`). |
+| `/api/dcf/simulate` | `POST` | Ephemeral sandboxed DCF / valuation simulation engine. |
 
 ---
 
@@ -113,7 +218,7 @@ pip install -r requirements.txt
 # Start the FastAPI server (Port 8008)
 python main.py
 ```
-*API will be available at [http://localhost:8008](http://localhost:8008) (Swagger docs at [http://localhost:8008/docs](http://localhost:8008/docs)).*
+*API will be available at [http://localhost:8008](http://localhost:8008).*
 
 ### 5. Setup & Run the Frontend
 ```bash
@@ -139,17 +244,17 @@ npm run tauri dev
 
 ## 📊 Evaluation & Verification
 
-A dedicated verification test suite is included:
+To run the automated integration test suite against the live backend:
 ```bash
-python scratch/test_suite.py
+python backend/test_integration.py
 ```
 
-### Test Coverage
-* **Endpoint Health**: Verified FastAPI operational status and CMSA 2007 compliance headers.
-* **Auto-Ingestion Engine**: Evaluated automated report puller, AST parser, and ChromaDB vector indexing.
-* **Universal Document Ingestion**: Tested multi-format parsing (.pdf, .md, .txt) through `/api/rag/ingest`.
-* **RAG Analyst Copilot**: Verified grounded response generation with regulatory note citations.
-* **Next.js Frontend Compilation**: Zero hydration errors and fast sub-second static page generation.
+### Verification Checklist
+* **API Health & CMSA Headers**: Verified FastAPI operational status and compliance headers.
+* **Hybrid Resolver (`/api/stocks/resolve`)**: Tested with exact tickers, ambiguous concepts (`"toy company"`), superlatives (`"malaysia largest company"`), and unlisted queries (`"haha"`).
+* **Sector KPI Dynamic Switching**: Verified banking metrics (NIM/CIR/GIL/CET-1) for banking stocks vs. corporate metrics for non-banks.
+* **4-Stage RAG Pipeline**: Verified FlashRank cross-encoder reranking and regulatory note citations (`[Note B1–B6]`).
+* **Frontend Compilation**: Verified with `npx tsc --noEmit` and `npm run build` with 0 errors.
 
 ---
 

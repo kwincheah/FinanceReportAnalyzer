@@ -11,7 +11,7 @@ from rank_bm25 import BM25Okapi
 from flashrank import Ranker, RerankRequest
 from typing import List, Dict, Optional
 from pydantic import BaseModel
-import os
+import threading
 
 
 class ChildChunk(BaseModel):
@@ -46,10 +46,41 @@ class AdvancedFinancialRAG:
         self.bm25_corpus: List[List[str]] = []
         self.bm25_index: Optional[BM25Okapi] = None
 
-    def index_document_hierarchical(self, stock_code: str, sections: List[Dict]):
+        # FastAPI runs sync endpoints on a thread pool, so indexing (which rebuilds
+        # the BM25 index) can overlap with a retrieval call. Serialise access.
+        self._lock = threading.RLock()
+
+    def _purge_stock(self, stock_code: str) -> None:
+        """
+        Removes every chunk previously indexed for a stock so that re-ingesting a
+        corrected / shorter filing never leaves stale passages retrievable.
+        """
+        prefix = f"{stock_code}_"
+
+        self.children = [c for c in self.children if not c.chunk_id.startswith(prefix)]
+        for p_id in [p for p in self.parents if p.startswith(prefix)]:
+            self.parents.pop(p_id, None)
+
+        try:
+            self.collection.delete(where={"stock_code": stock_code})
+        except Exception as e:
+            print(f"[RAG] ChromaDB purge warning for {stock_code}: {e}")
+
+    def index_document_hierarchical(self, stock_code: str, sections: List[Dict], replace: bool = True):
         """
         Stage 1: Indexes Parent sections and breaks them into Child paragraphs.
+
+        When replace=True (default) any previously indexed content for this stock
+        is purged first, so a re-uploaded filing fully supersedes the old one.
         """
+        stock_code = str(stock_code).strip()
+        with self._lock:
+            self._index_document_hierarchical_locked(stock_code, sections, replace)
+
+    def _index_document_hierarchical_locked(self, stock_code: str, sections: List[Dict], replace: bool):
+        if replace:
+            self._purge_stock(stock_code)
+
         for s_idx, sec in enumerate(sections):
             p_id = f"{stock_code}_p_{s_idx}"
             heading = sec.get("heading", "Note")
@@ -82,13 +113,16 @@ class AdvancedFinancialRAG:
 
         # Build BM25 Sparse Index on all Child Chunks
         self.bm25_corpus = [child.text.lower().split() for child in self.children]
-        if self.bm25_corpus:
-            self.bm25_index = BM25Okapi(self.bm25_corpus)
+        self.bm25_index = BM25Okapi(self.bm25_corpus) if self.bm25_corpus else None
 
     def search_hybrid_and_rerank(self, stock_code: str, query: str, top_k: int = 3) -> List[Dict]:
         """
         Stage 2 (Hybrid RRF) + Stage 3 (Cross-Encoder Rerank) + Stage 4 (Compression)
         """
+        with self._lock:
+            return self._search_hybrid_and_rerank_locked(stock_code, query, top_k)
+
+    def _search_hybrid_and_rerank_locked(self, stock_code: str, query: str, top_k: int) -> List[Dict]:
         if not self.children:
             return []
 

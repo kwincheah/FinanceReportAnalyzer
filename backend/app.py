@@ -1,8 +1,10 @@
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
+from difflib import SequenceMatcher
+from pathlib import Path
 from google import genai
 from dotenv import load_dotenv
-import os
+import json
 import yfinance as yf
 import requests
 import re
@@ -15,6 +17,7 @@ class BursaReport(BaseModel):
     stock_code: str
     company_name: str
     quarter: str
+    period_ended: Optional[str] = Field(None, description="Financial period end date, e.g. 30-Jun-2026")
 
     revenue: float = Field(ge=0, description="Revenue must be in RM '000")
     prev_revenue: Optional[float] = Field(None, ge=0, description="Preceding quarter revenue must be in RM '000")
@@ -60,11 +63,17 @@ def analyze_financials(report: BursaReport, share_price_myr: float) -> dict:
 
 
 def generate_analysis_summary(report: BursaReport, metrics: dict) -> str:
+    period_line = (
+        f"- Reporting Period Ended: {report.period_ended}"
+        if getattr(report, "period_ended", None)
+        else "- Reporting Period Ended: (not disclosed in the source filing)"
+    )
     prompt = f"""You are a professional Bursa Malaysia equity research analyst.
 Analyze the following quarterly financial performance for {report.company_name} ({report.stock_code}.KL).
 
 Financial Performance Data:
 - Quarter: {report.quarter}
+{period_line}
 - Revenue: RM {report.revenue:,.0f} thousand (QoQ Growth: {metrics.get('rev_growth_qoq', 'N/A')}%)
 - Net Profit (PATAMI): RM {report.net_profit:,.0f} thousand (QoQ Growth: {metrics.get('profit_growth_qoq', 'N/A')}%)
 - Net Profit Margin: {metrics.get('net_margin_pct', 'N/A')}%
@@ -78,6 +87,7 @@ Instructions:
    - Paragraph 2: Balance sheet solvency, debt covenants, and liquidity.
    - Paragraph 3: Valuation multiples and forward business outlook.
 2. Maintain an authoritative, professional, and objective tone. Do NOT provide direct buy/sell recommendations or price targets under CMSA 2007.
+3. Use ONLY the figures and dates supplied above. Never invent or infer a different period-end date, dividend, or segment figure.
 """
     client = genai.Client()
     for m in ["gemini-flash-lite-latest", "gemini-3.5-flash"]:
@@ -101,7 +111,7 @@ Instructions:
     return (
         f"**Executive Review for {report.company_name} ({report.stock_code}.KL)**\n\n"
         f"During {report.quarter}, {report.company_name} delivered quarterly revenue of RM {report.revenue:,.0f} thousand, "
-        f"reflecting a sequential top-line growth of {rev_growth}% quarter-on-quarter. "
+        f"reflecting a sequential top-line growth of {rev_growth}% and net profit growth of {profit_growth}% quarter-on-quarter. "
         f"Net Profit Attributable to Ordinary Equity Holders (PATAMI) closed at RM {report.net_profit:,.0f} thousand, "
         f"yielding an operating net margin of {margin}% and demonstrating disciplined cost management across operating divisions.\n\n"
         f"From a capital structure perspective, the Group sustains a robust balance sheet with a gearing ratio of {metrics.get('gearing_ratio', '0.0')}x. "
@@ -112,38 +122,146 @@ Instructions:
     )
 
 
-def disambiguate_company_with_llm(vague_query: str) -> str:
+def disambiguate_query_hybrid(vague_query: str) -> dict:
     """
-    Uses Gemini to resolve natural language company descriptions
-    into a clean Bursa Malaysia listed company name or 4-digit ticker.
+    Evaluates search query against Bursa Malaysia equities using Gemini.
+    Returns a structured dictionary:
+    {
+        "type": "EXACT" | "MULTIPLE" | "NONE",
+        "codes": ["5296", "5132"],
+        "stock": dict or None,
+        "candidates": [stock_dict, ...],
+        "title": "Category or Security Title",
+        "explanation": "Contextual reason for recommendation or rejection"
+    }
     """
+    if not vague_query or not str(vague_query).strip():
+        return {
+            "type": "NONE",
+            "codes": [],
+            "stock": None,
+            "candidates": [],
+            "title": "No Matching Security",
+            "explanation": "Query cannot be empty."
+        }
+
     client = genai.Client()
-    
-    prompt = f"""
-Identify which publicly listed company on Bursa Malaysia (KLSE) the user is referring to.
+
+    prompt = f"""You are an institutional financial analyst disambiguating search queries for Bursa Malaysia (KLSE) equities.
 Query: "{vague_query}"
 
 Instructions:
-- Return ONLY the 4-digit stock code or the exact company name.
-- Do NOT provide explanations, preamble, or commentary.
+1. If the query clearly refers to ONE specific company (e.g. "Maybank", "1155", "malaysia largest company", "Tenaga", "AirAsia"), return:
+TYPE: EXACT
+CODES: <4-digit code>
+TITLE: Identified Bursa Malaysia Security
+EXPLANATION: <brief reason>
+
+2. If the query is ambiguous, broad, conceptual, or refers to an industry, sector, or retail product category that spans multiple Bursa-listed companies (e.g. "toy company", "banks", "semiconductors", "oil and gas", "cheapest stocks", "renewable energy", "rubber gloves", "healthcare"):
+Identify up to 4 most relevant Bursa Malaysia listed companies (e.g. for "toy company", consumer retailers like 5296 MR DIY which operates MR. TOY, or 5132 AEON which operates large toy departments; for "banks", 1155, 1023, 1295, 5819). Return:
+TYPE: MULTIPLE
+CODES: <comma-separated 4-digit codes, max 4>
+TITLE: <concise category title, e.g. "Toy Retail & Children Merchandise">
+EXPLANATION: <brief context explaining why these constituents were selected>
+
+3. If the query is pure nonsense, gibberish, an animal, or completely unrelated to any company or business sector on Bursa Malaysia (e.g. "haha", "anaconda", "snake", "asdf123", "random"):
+Return:
+TYPE: NONE
+TITLE: No Matching Security
+EXPLANATION: No listed Bursa Malaysia security, sector, or peer constituent matches this query.
+
+Format your output strictly with the keys (TYPE, CODES, TITLE, EXPLANATION). No other markdown or chatter.
 """
+    raw_text = ""
     for m in ["gemini-flash-lite-latest", "gemini-3.5-flash"]:
         try:
             response = client.models.generate_content(
                 model=m,
                 contents=prompt,
             )
-            raw_text = (response.text or "").strip()
-            if raw_text:
-                code_match = re.search(r'\b(\d{4})\b', raw_text)
-                if code_match:
-                    return code_match.group(1)
-                cleaned = re.sub(r'^(I will|The company|Based on|Target|Answer|Company|Result).*?[:\.]\s*', '', raw_text, flags=re.IGNORECASE).strip()
-                lines = [line.strip() for line in cleaned.splitlines() if line.strip()]
-                return lines[-1] if lines else cleaned
+            if response.text and response.text.strip():
+                raw_text = response.text.strip()
+                break
         except Exception as e:
             print(f"[Disambiguate Warning] Model {m} failed: {e}")
 
+    if not raw_text:
+        return {
+            "type": "NONE",
+            "codes": [],
+            "stock": None,
+            "candidates": [],
+            "title": "No Matching Security",
+            "explanation": f"No listed Bursa Malaysia security found for '{vague_query}'."
+        }
+
+    # Extract TYPE
+    type_match = re.search(r'TYPE\s*:\s*(EXACT|MULTIPLE|NONE)', raw_text, re.IGNORECASE)
+    res_type = type_match.group(1).upper() if type_match else "NONE"
+
+    # Extract TITLE
+    title_match = re.search(r'TITLE\s*:\s*(.+)', raw_text, re.IGNORECASE)
+    res_title = title_match.group(1).strip() if title_match else ("Matching Bursa Equities" if res_type == "MULTIPLE" else "Identified Bursa Security")
+
+    # Extract EXPLANATION
+    expl_match = re.search(r'EXPLANATION\s*:\s*(.+)', raw_text, re.IGNORECASE)
+    res_expl = expl_match.group(1).strip() if expl_match else f"Query: '{vague_query}'"
+
+    # Extract all 4-digit codes from CODES line
+    code_line_match = re.search(r'CODES\s*:\s*(.+)', raw_text, re.IGNORECASE)
+    code_text = code_line_match.group(1) if code_line_match else ""
+    raw_codes = re.findall(r'\b\d{4}\b', code_text)
+
+    # Verify each code in bursa_stock_list.json
+    candidates = []
+    seen = set()
+    for c in raw_codes:
+        if c not in seen:
+            stock = direct_match_search(c)
+            if stock:
+                candidates.append(stock)
+                seen.add(c)
+
+    if res_type == "NONE" or not candidates:
+        return {
+            "type": "NONE",
+            "codes": [],
+            "stock": None,
+            "candidates": [],
+            "title": "No Matching Security",
+            "explanation": res_expl if res_type == "NONE" else f"No listed Bursa Malaysia security found for '{vague_query}'."
+        }
+
+    if res_type == "EXACT" or len(candidates) == 1:
+        return {
+            "type": "EXACT",
+            "codes": [candidates[0]["code"]],
+            "stock": candidates[0],
+            "candidates": candidates,
+            "title": res_title,
+            "explanation": res_expl
+        }
+
+    return {
+        "type": "MULTIPLE",
+        "codes": [c["code"] for c in candidates[:4]],
+        "stock": None,
+        "candidates": candidates[:4],
+        "title": res_title,
+        "explanation": res_expl
+    }
+
+
+def disambiguate_company_with_llm(vague_query: str) -> str:
+    """
+    Uses Gemini to resolve natural language company descriptions into a 4-digit code.
+    Maintained for backward compatibility with resolve_bursa_stock_hybrid.
+    """
+    res = disambiguate_query_hybrid(vague_query)
+    if res["type"] == "EXACT" and res.get("stock"):
+        return res["stock"]["code"]
+    elif res["type"] == "MULTIPLE" and res.get("candidates"):
+        return res["candidates"][0]["code"]
     return ""
 
 
@@ -172,138 +290,126 @@ def search_yahoo_finance(keyword: str) -> List[Dict[str, str]]:
         return []
 
 
-# Comprehensive Dictionary of Top 60+ Bursa Malaysia Companies & Aliases
-KNOWN_BURSA_TICKERS = {
-    # Banks & Financials
-    "1155": {"code": "1155", "ticker": "1155.KL", "name": "Malayan Banking Berhad"},
-    "MAYBANK": {"code": "1155", "ticker": "1155.KL", "name": "Malayan Banking Berhad"},
-    "MALAYAN BANKING": {"code": "1155", "ticker": "1155.KL", "name": "Malayan Banking Berhad"},
-    "1023": {"code": "1023", "ticker": "1023.KL", "name": "CIMB Group Holdings Berhad"},
-    "CIMB": {"code": "1023", "ticker": "1023.KL", "name": "CIMB Group Holdings Berhad"},
-    "1295": {"code": "1295", "ticker": "1295.KL", "name": "Public Bank Berhad"},
-    "PBBANK": {"code": "1295", "ticker": "1295.KL", "name": "Public Bank Berhad"},
-    "PUBLIC BANK": {"code": "1295", "ticker": "1295.KL", "name": "Public Bank Berhad"},
-    "1066": {"code": "1066", "ticker": "1066.KL", "name": "RHB Bank Berhad"},
-    "RHB": {"code": "1066", "ticker": "1066.KL", "name": "RHB Bank Berhad"},
-    "RHB BANK": {"code": "1066", "ticker": "1066.KL", "name": "RHB Bank Berhad"},
-    "5819": {"code": "5819", "ticker": "5819.KL", "name": "Hong Leong Bank Berhad"},
-    "HLBANK": {"code": "5819", "ticker": "5819.KL", "name": "Hong Leong Bank Berhad"},
-    "HONG LEONG": {"code": "5819", "ticker": "5819.KL", "name": "Hong Leong Bank Berhad"},
-    "1015": {"code": "1015", "ticker": "1015.KL", "name": "AMMB Holdings Berhad"},
-    "AMBANK": {"code": "1015", "ticker": "1015.KL", "name": "AMMB Holdings Berhad"},
-    "1818": {"code": "1818", "ticker": "1818.KL", "name": "Bursa Malaysia Berhad"},
-    "BURSA": {"code": "1818", "ticker": "1818.KL", "name": "Bursa Malaysia Berhad"},
-
-    # Energy & Utilities
-    "5347": {"code": "5347", "ticker": "5347.KL", "name": "Tenaga Nasional Berhad"},
-    "TENAGA": {"code": "5347", "ticker": "5347.KL", "name": "Tenaga Nasional Berhad"},
-    "TNB": {"code": "5347", "ticker": "5347.KL", "name": "Tenaga Nasional Berhad"},
-    "5183": {"code": "5183", "ticker": "5183.KL", "name": "PETRONAS Chemicals Group Berhad"},
-    "PCHEM": {"code": "5183", "ticker": "5183.KL", "name": "PETRONAS Chemicals Group Berhad"},
-    "PETRONAS": {"code": "5183", "ticker": "5183.KL", "name": "PETRONAS Chemicals Group Berhad"},
-    "PETRONAS CHEMICALS": {"code": "5183", "ticker": "5183.KL", "name": "PETRONAS Chemicals Group Berhad"},
-    "6033": {"code": "6033", "ticker": "6033.KL", "name": "PETRONAS Gas Berhad"},
-    "PETGAS": {"code": "6033", "ticker": "6033.KL", "name": "PETRONAS Gas Berhad"},
-    "5681": {"code": "5681", "ticker": "5681.KL", "name": "PETRONAS Dagangan Berhad"},
-    "PETDAG": {"code": "5681", "ticker": "5681.KL", "name": "PETRONAS Dagangan Berhad"},
-    "6742": {"code": "6742", "ticker": "6742.KL", "name": "YTL Power International Berhad"},
-    "YTL POWER": {"code": "6742", "ticker": "6742.KL", "name": "YTL Power International Berhad"},
-    "YTLPOWR": {"code": "6742", "ticker": "6742.KL", "name": "YTL Power International Berhad"},
-    "4677": {"code": "4677", "ticker": "4677.KL", "name": "YTL Corporation Berhad"},
-    "YTL": {"code": "4677", "ticker": "4677.KL", "name": "YTL Corporation Berhad"},
-    "7277": {"code": "7277", "ticker": "7277.KL", "name": "Dialog Group Berhad"},
-    "DIALOG": {"code": "7277", "ticker": "7277.KL", "name": "Dialog Group Berhad"},
-    "5243": {"code": "5243", "ticker": "5243.KL", "name": "Velesto Energy Berhad"},
-
-    # Retail, Consumer & Healthcare
-    "5296": {"code": "5296", "ticker": "5296.KL", "name": "MR D.I.Y. Group (M) Berhad"},
-    "MR DIY": {"code": "5296", "ticker": "5296.KL", "name": "MR D.I.Y. Group (M) Berhad"},
-    "MR. DIY": {"code": "5296", "ticker": "5296.KL", "name": "MR D.I.Y. Group (M) Berhad"},
-    "MR. D.I.Y.": {"code": "5296", "ticker": "5296.KL", "name": "MR D.I.Y. Group (M) Berhad"},
-    "7113": {"code": "7113", "ticker": "7113.KL", "name": "Top Glove Corporation Bhd"},
-    "TOPGLOVE": {"code": "7113", "ticker": "7113.KL", "name": "Top Glove Corporation Bhd"},
-    "TOP GLOVE": {"code": "7113", "ticker": "7113.KL", "name": "Top Glove Corporation Bhd"},
-    "5168": {"code": "5168", "ticker": "5168.KL", "name": "Hartalega Holdings Berhad"},
-    "HARTALEGA": {"code": "5168", "ticker": "5168.KL", "name": "Hartalega Holdings Berhad"},
-    "5225": {"code": "5225", "ticker": "5225.KL", "name": "IHH Healthcare Berhad"},
-    "IHH": {"code": "5225", "ticker": "5225.KL", "name": "IHH Healthcare Berhad"},
-    "4707": {"code": "4707", "ticker": "4707.KL", "name": "Nestle (Malaysia) Berhad"},
-    "NESTLE": {"code": "4707", "ticker": "4707.KL", "name": "Nestle (Malaysia) Berhad"},
-    "7084": {"code": "7084", "ticker": "7084.KL", "name": "QL Resources Berhad"},
-    "QL": {"code": "7084", "ticker": "7084.KL", "name": "QL Resources Berhad"},
-
-    # Telecommunications & Tech
-    "6012": {"code": "6012", "ticker": "6012.KL", "name": "Maxis Berhad"},
-    "MAXIS": {"code": "6012", "ticker": "6012.KL", "name": "Maxis Berhad"},
-    "6947": {"code": "6947", "ticker": "6947.KL", "name": "CelcomDigi Berhad"},
-    "CELCOMDIGI": {"code": "6947", "ticker": "6947.KL", "name": "CelcomDigi Berhad"},
-    "DIGI": {"code": "6947", "ticker": "6947.KL", "name": "CelcomDigi Berhad"},
-    "6888": {"code": "6888", "ticker": "6888.KL", "name": "Axiata Group Berhad"},
-    "AXIATA": {"code": "6888", "ticker": "6888.KL", "name": "Axiata Group Berhad"},
-    "4863": {"code": "4863", "ticker": "4863.KL", "name": "Telekom Malaysia Berhad"},
-    "TM": {"code": "4863", "ticker": "4863.KL", "name": "Telekom Malaysia Berhad"},
-    "TELEKOM": {"code": "4863", "ticker": "4863.KL", "name": "Telekom Malaysia Berhad"},
-    "0166": {"code": "0166", "ticker": "0166.KL", "name": "Inari Amertron Berhad"},
-    "INARI": {"code": "0166", "ticker": "0166.KL", "name": "Inari Amertron Berhad"},
-    "0138": {"code": "0138", "ticker": "0138.KL", "name": "MY E.G. Services Berhad"},
-    "MYEG": {"code": "0138", "ticker": "0138.KL", "name": "MY E.G. Services Berhad"},
-
-    # Conglomerates, Construction & Industrials
-    "3182": {"code": "3182", "ticker": "3182.KL", "name": "Genting Berhad"},
-    "GENTING": {"code": "3182", "ticker": "3182.KL", "name": "Genting Berhad"},
-    "4715": {"code": "4715", "ticker": "4715.KL", "name": "Genting Malaysia Berhad"},
-    "GENM": {"code": "4715", "ticker": "4715.KL", "name": "Genting Malaysia Berhad"},
-    "5398": {"code": "5398", "ticker": "5398.KL", "name": "Gamuda Berhad"},
-    "GAMUDA": {"code": "5398", "ticker": "5398.KL", "name": "Gamuda Berhad"},
-    "5211": {"code": "5211", "ticker": "5211.KL", "name": "Sunway Berhad"},
-    "SUNWAY": {"code": "5211", "ticker": "5211.KL", "name": "Sunway Berhad"},
-    "4197": {"code": "4197", "ticker": "4197.KL", "name": "Sime Darby Berhad"},
-    "SIME": {"code": "4197", "ticker": "4197.KL", "name": "Sime Darby Berhad"},
-    "SIME DARBY": {"code": "4197", "ticker": "4197.KL", "name": "Sime Darby Berhad"},
-    "8869": {"code": "8869", "ticker": "8869.KL", "name": "Press Metal Aluminium Holdings Berhad"},
-    "PMETAL": {"code": "8869", "ticker": "8869.KL", "name": "Press Metal Aluminium Holdings Berhad"},
-    "PRESS METAL": {"code": "8869", "ticker": "8869.KL", "name": "Press Metal Aluminium Holdings Berhad"},
-    "5099": {"code": "5099", "ticker": "5099.KL", "name": "AirAsia X Berhad"},
-    "AIRASIA": {"code": "5099", "ticker": "5099.KL", "name": "Capital A Berhad (AirAsia)"},
-    "CAPITAL A": {"code": "5099", "ticker": "5099.KL", "name": "Capital A Berhad (AirAsia)"},
-    "4065": {"code": "4065", "ticker": "4065.KL", "name": "PPB Group Berhad"},
-    "PPB": {"code": "4065", "ticker": "4065.KL", "name": "PPB Group Berhad"},
-    "3816": {"code": "3816", "ticker": "3816.KL", "name": "MISC Berhad"},
-    "MISC": {"code": "3816", "ticker": "3816.KL", "name": "MISC Berhad"},
-    "1961": {"code": "1961", "ticker": "1961.KL", "name": "IOI Corporation Berhad"},
-    "IOI": {"code": "1961", "ticker": "1961.KL", "name": "IOI Corporation Berhad"},
-    "2445": {"code": "2445", "ticker": "2445.KL", "name": "Kuala Lumpur Kepong Berhad"},
-    "KLK": {"code": "2445", "ticker": "2445.KL", "name": "Kuala Lumpur Kepong Berhad"},
-}
 
 
-def resolve_bursa_stock_hybrid(user_query: str) -> dict:
-    cleaned = user_query.strip().upper()
+def _load_bursa_stock_list(path: Optional[str] = None) -> List[dict]:
+    """Safely loads bursa_stock_list.json from backend, project root, or custom path."""
+    if path:
+        p = Path(path)
+        if p.exists():
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, list):
+                        return data
+            except Exception as e:
+                print(f"[bursa_stock_list] Error loading {p}: {e}")
 
-    # Stage 0: Instant Direct Lookup in Dictionary
-    if cleaned in KNOWN_BURSA_TICKERS:
-        return KNOWN_BURSA_TICKERS[cleaned]
+    candidates = [
+        Path(__file__).resolve().parent / "bursa_stock_list.json",
+        Path(__file__).resolve().parent.parent / "bursa_stock_list.json",
+        Path(__file__).resolve().parent.parent / "frontend" / "bursa_stock_list.json",
+    ]
+    for c in candidates:
+        if c.exists():
+            try:
+                with open(c, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, list):
+                        return data
+            except Exception as e:
+                print(f"[bursa_stock_list] Error loading {c}: {e}")
 
-    # Stage 0.5: Fuzzy Substring Search across Known Tickers
-    for key, val in KNOWN_BURSA_TICKERS.items():
-        if key == cleaned or (len(key) > 3 and key in cleaned) or (len(cleaned) > 3 and cleaned in key):
-            return val
-        if cleaned in val["name"].upper() or val["name"].upper() in cleaned:
-            return val
+    return []
 
-    # If it's a 4-digit code e.g. "1155" or "5347"
-    digit_match = re.search(r'\b(\d{4})\b', cleaned)
-    if digit_match:
-        code = digit_match.group(1)
-        if code in KNOWN_BURSA_TICKERS:
-            return KNOWN_BURSA_TICKERS[code]
-        ticker = f"{code}.KL"
-        try:
-            stock = yf.Ticker(ticker)
-            name = stock.info.get("longName") or stock.info.get("shortName") or f"Bursa Stock {code}"
-            return {"code": code, "ticker": ticker, "name": name}
-        except Exception:
-            return {"code": code, "ticker": ticker, "name": f"Bursa Stock {code}"}
+
+def direct_match_search(user_query: str, path: Optional[str] = None) -> Optional[dict]:
+    """
+    Finds exact, prefix, or fuzzy similarity match for code, ticker, or short_name in bursa_stock_list.json.
+    """
+    if not user_query:
+        return None
+
+    cleaned_input = str(user_query).strip().upper()
+    if not cleaned_input:
+        return None
+
+    bursa_list = _load_bursa_stock_list(path)
+    if not bursa_list:
+        return None
+
+    # Priority 1: Exact 4-digit code or exact ticker match
+    for stock in bursa_list:
+        code = str(stock.get("code", "")).strip().upper()
+        ticker = str(stock.get("ticker", "")).strip().upper()
+        if code == cleaned_input or ticker == cleaned_input:
+            return stock
+
+    # Priority 2: Exact or prefix match on short_name or full name
+    for stock in bursa_list:
+        short_name = str(stock.get("short_name", "")).strip().upper()
+        name = str(stock.get("name", "")).strip().upper()
+        if short_name == cleaned_input or name == cleaned_input:
+            return stock
+        if len(cleaned_input) >= 3 and (short_name.startswith(cleaned_input) or name.startswith(cleaned_input)):
+            return stock
+
+    # Priority 3: Fuzzy match on short_name with similarity ratio >= 0.75
+    # Numeric queries are never fuzzy-matched: a mistyped 4-digit code must not
+    # silently resolve to an unrelated company (e.g. "9999" -> "99 SPEED MART").
+    if len(cleaned_input) >= 4 and not cleaned_input.replace(".", "").isdigit():
+        best_stock = None
+        best_score = 0.0
+        THRESHOLD = 0.75
+
+        for stock in bursa_list:
+            short_name = str(stock.get("short_name", "")).strip().upper()
+            if not short_name:
+                continue
+            score = SequenceMatcher(None, cleaned_input, short_name).ratio()
+            if score > best_score:
+                best_score = score
+                best_stock = stock
+
+        if best_stock and best_score >= THRESHOLD:
+            return best_stock
+
+    return None
+
+
+class StockNotFoundError(ValueError):
+    """Raised when a user query cannot be resolved to a Bursa-listed security."""
+
+
+def resolve_bursa_stock_hybrid(user_query: str, result: Optional[Any] = None) -> dict:
+    """
+    Resolves user query to a Bursa stock dictionary.
+    'result' is optional so single-argument callers in main.py will not break.
+
+    Raises StockNotFoundError instead of silently substituting an unrelated
+    company: showing another issuer's financials would be a factual error.
+    """
+    if user_query is None or not str(user_query).strip():
+        raise StockNotFoundError("Please enter a company name or 4-digit Bursa stock code.")
+
+    # If direct_match_search already returned a valid dict, use it directly
+    if result and isinstance(result, dict) and "ticker" in result:
+        return result
+
+    # Stage 0: Direct match against bursa_stock_list.json
+    direct = direct_match_search(user_query)
+    if direct and isinstance(direct, dict) and "ticker" in direct:
+        return direct
+
+    query_text = str(user_query).strip()
+    # A 4-digit query is unambiguously a Bursa stock code. If it is not in the
+    # listing, no amount of external search or LLM guessing makes it valid, so
+    # fail loudly instead of returning another issuer's report.
+    if len(query_text) == 4 and query_text.isdigit():
+        raise StockNotFoundError(
+            f"Stock code '{query_text}' is not a listed Bursa Malaysia security. "
+            f"Check the 4-digit code and try again."
+        )
 
     # Stage 1: Yahoo search
     print(f"-> [Stage 1] Direct search for: '{user_query}'...")
@@ -312,35 +418,32 @@ def resolve_bursa_stock_hybrid(user_query: str) -> dict:
         print(f"   Direct match found: {matches[0]['name']} ({matches[0]['ticker']})")
         return matches[0]
 
-    # Stage 2: Fallback to LLM disambiguation
-    print(f"-> [Stage 2] Engaging LLM Disambiguator for: '{user_query}'...")
-    try:
-        clarified = disambiguate_company_with_llm(user_query).strip()
-        print(f"   LLM clarified: '{user_query}' -> '{clarified}'")
+    # Stage 2: Fallback to LLM disambiguation.
+    # Only descriptive queries are worth disambiguating; a short single-token
+    # query that matched nothing is a typo, and letting the model invent a
+    # company for it would surface an unrelated issuer's financials.
+    looks_descriptive = (" " in query_text) or len(query_text) >= 8
+    if looks_descriptive:
+        print(f"-> [Stage 2] Engaging LLM Disambiguator for: '{user_query}'...")
+        try:
+            clarified = disambiguate_company_with_llm(user_query).strip().upper()
+            print(f"   LLM clarified: '{user_query}' -> '{clarified}'")
 
-        if clarified.upper() in KNOWN_BURSA_TICKERS:
-            return KNOWN_BURSA_TICKERS[clarified.upper()]
+            if clarified:
+                clarified_search = direct_match_search(clarified)
+                if clarified_search and isinstance(clarified_search, dict) and "ticker" in clarified_search:
+                    return clarified_search
 
-        digit_match = re.search(r'\b(\d{4})\b', clarified)
-        if digit_match:
-            code = digit_match.group(1)
-            if code in KNOWN_BURSA_TICKERS:
-                return KNOWN_BURSA_TICKERS[code]
-            return {"code": code, "ticker": f"{code}.KL", "name": f"Bursa Stock {code}"}
+                matches = search_yahoo_finance(clarified)
+                if matches:
+                    return matches[0]
+        except Exception as e:
+            print(f"Disambiguation error: {e}")
 
-        for key, val in KNOWN_BURSA_TICKERS.items():
-            if key in clarified.upper() or clarified.upper() in key:
-                return val
-
-        matches = search_yahoo_finance(clarified)
-        if matches:
-            return matches[0]
-    except Exception as e:
-        print(f"Disambiguation error: {e}")
-
-    # Fallback to default Maybank 1155 instead of crashing
-    print(f"Warning: Falling back to default Bursa ticker for '{user_query}'")
-    return KNOWN_BURSA_TICKERS["1155"]
+    raise StockNotFoundError(
+        f"No Bursa Malaysia listed company found for '{user_query}'. "
+        f"Try a 4-digit stock code (e.g. 1155) or a company name (e.g. Maybank)."
+    )
 
 
 def fetch_live_market_data(ticker_symbol: str) -> dict:
